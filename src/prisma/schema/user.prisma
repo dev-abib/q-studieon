@@ -19,29 +19,45 @@ enum bilingCycle {
   yearly
 }
 
+enum role {
+  user
+  admin
+  super_admin
+}
+
 model User {
   id                     String              @id @default(cuid())
   name                   String?
   email                  String?             @unique
-  isPaid                 Boolean?            @default(false)
+  password               String?
   profilePictureURL      String?
   profilePicturePublicId String?
-  password               String?
-  refereshToken          String?
-  resetToken             String?
+
+  isPaid                 Boolean?            @default(false)
+  isGuest                Boolean?
   isOtpVerified          Boolean?            @default(false)
+
   otp                    String?
   otpAttempts            Int?                @default(0)
   otpExpires             DateTime?
-  isGuest                Boolean?
+
+  refereshToken          String?
+  resetToken             String?
+
   guestExpiresAt         DateTime?
+
   authProvider           AuthProvider?       @default(local)
+
   planKey                String?
   billingCycle           bilingCycle?        @default(monthly)
   status                 subscriptionStatus? @default(free)
+
   stripeCustomerId       String?
   stripeSubscriptionId   String?
   currentPeriodEnd       Int?
+
+  role                   role                @default(user)
+
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
