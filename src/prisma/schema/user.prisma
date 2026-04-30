@@ -26,40 +26,41 @@ enum role {
 }
 
 model User {
-  id                     String              @id @default(cuid())
+  id                     String  @id @default(cuid())
   name                   String?
-  email                  String?             @unique
+  email                  String? @unique
   password               String?
   profilePictureURL      String?
   profilePicturePublicId String?
 
-  isPaid                 Boolean?            @default(false)
-  isGuest                Boolean?
-  isOtpVerified          Boolean?            @default(false)
+  isPaid        Boolean? @default(false)
+  isGuest       Boolean?
+  isOtpVerified Boolean? @default(false)
 
-  otp                    String?
-  otpAttempts            Int?                @default(0)
-  otpExpires             DateTime?
+  otp         String?
+  otpAttempts Int?      @default(0)
+  otpExpires  DateTime?
 
-  refereshToken          String?
-  resetToken             String?
+  refreshToken String?
+  resetToken   String?
 
-  guestExpiresAt         DateTime?
+  guestExpiresAt DateTime?
 
-  authProvider           AuthProvider?       @default(local)
+  authProvider AuthProvider? @default(local)
 
-  planKey                String?
-  billingCycle           bilingCycle?        @default(monthly)
-  status                 subscriptionStatus? @default(free)
+  planKey      String?
+  billingCycle bilingCycle?        @default(monthly)
+  status       subscriptionStatus? @default(free)
 
-  stripeCustomerId       String?
-  stripeSubscriptionId   String?
-  currentPeriodEnd       Int?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  currentPeriodEnd     Int?
 
-  role                   role                @default(user)
+  role role @default(user)
 
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  termsAndConditions Boolean  @default(false)
 
   @@map("users")
 }
