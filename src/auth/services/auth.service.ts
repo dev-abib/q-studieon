@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -11,11 +13,13 @@ import { User } from '@prisma/client';
 import { EmailService } from 'src/infra/mail/mail.service';
 import { accountVerificationTemplate } from 'src/infra/mail/templates/auth/account-verification.template';
 import { randomBytes, createHash } from 'crypto';
-import { VerifyDto } from '../dto/verify-otp.dto';
 import { LoginDto } from '../dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { StringValue } from 'ms';
 import { JwtPayload } from '../types/jwt.types';
+import { VerifyAccountDto } from '../dto/verify-account.dto';
+import { ResendOtpDto } from '../dto/resend-otp';
+import { accountVerificationConfirmationTemplate } from 'src/infra/mail/templates/system/account-verification-confirmation.template';
 
 @Injectable()
 export class AuthService {
@@ -66,12 +70,7 @@ export class AuthService {
     return await bcrypt.compare(password, hashPassword);
   }
 
-  // validate get expire in
-  private getExpiresIn(value: string | undefined): string {
-    if (!value) throw new Error('Missing JWT expiresIn env');
-    return value;
-  }
-
+  // validate env
   private env(value: string | undefined, name: string): string {
     if (!value) {
       throw new Error(`Missing env: ${name}`);
@@ -83,10 +82,17 @@ export class AuthService {
   private async findUser(
     type: 'email' | 'id' = 'email',
     payload: string,
-  ): Promise<User | null> {
-    return await this.prisma.user.findUnique({
+  ): Promise<User> {
+    const user = await this.prisma.user.findUnique({
       where: type === 'email' ? { email: payload } : { id: payload },
     });
+
+    if (!user)
+      throw new BadRequestException(
+        ' User not found, account removed or deleted,',
+      );
+
+    return user;
   }
 
   private getJwtConfig(
@@ -178,11 +184,13 @@ export class AuthService {
 
   // register account service
   async register(dto: RegisterDto) {
-    const existing = await this.findUser('email', dto.email);
+    const isExisting = await this.prisma.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
 
-    if (existing) {
-      throw new ConflictException('Email already in use.');
-    }
+    if (isExisting) throw new BadRequestException('Account already exists');
 
     const otp = this.generateOtp();
     const otpExpiry = this.getOtpExpiry();
@@ -199,6 +207,7 @@ export class AuthService {
         otpExpires: otpExpiry,
         termsAndConditions: dto.termsAndConditions,
         role: 'user',
+        otpAttempts: 0,
       },
       select: {
         id: true,
@@ -208,9 +217,9 @@ export class AuthService {
       },
     });
 
-    await this.email.sendEmail({
+    const isMailSent = await this.email.sendEmail({
       to: user.email as string,
-      subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
+      subject: `Account verification otp ${process.env.MAIL_FROM_NAME as string}`,
       html: accountVerificationTemplate({
         name: user.name as string,
         email: user.email as string,
@@ -219,28 +228,20 @@ export class AuthService {
     });
 
     return {
-      message:
-        'Account created successfully and sent account verification mail.',
+      message: isMailSent
+        ? 'Account created successfully and sent account verification mail.'
+        : `Account created successfully, can't send otp at the moment. Please try again later`,
       data: user,
     };
   }
 
   // verify account service
-  async verifyAccount(dto: VerifyDto) {
+  async verifyAccount(dto: VerifyAccountDto) {
     const user = await this.findUser('email', dto.email);
 
-    if (!user) throw new BadRequestException('User not found');
     if (user.isOtpVerified)
       throw new BadRequestException('Account already verified');
-    if (user.otpAttempts ?? 0 > 3) {
-      await this.prisma.user.delete({
-        where: { email: dto.email },
-      });
 
-      throw new BadRequestException(
-        'Max otp attempts exceeded, please register again',
-      );
-    }
     if (user.otpExpires && user.otpExpires < new Date())
       throw new BadRequestException('Otp expired');
 
@@ -263,6 +264,14 @@ export class AuthService {
       },
     });
 
+    await this.email.sendEmail({
+      to: user.email as string,
+      subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
+      html: accountVerificationConfirmationTemplate({
+        name: user.name as string,
+      }),
+    });
+
     return {
       message: 'Email verified successfully',
     };
@@ -271,15 +280,19 @@ export class AuthService {
   // login account service
   async loginAccount(dto: LoginDto) {
     const user = await this.findUser('email', dto.email);
-    if (!user) throw new UnauthorizedException('Invalid email or password');
 
     const isValidPass = await this.comparePassword(
       dto.password,
       user.password as string,
     );
-
     if (!isValidPass)
       throw new UnauthorizedException('Invalid email or password');
+
+    const isVerified = user.isOtpVerified;
+    if (!isVerified)
+      throw new UnauthorizedException(
+        'Before login , please verify you account',
+      );
 
     const token = this.generateToken(
       {
@@ -301,11 +314,66 @@ export class AuthService {
       },
     });
 
+    const payload = {
+      name: user.name,
+      email: user.email,
+      profilePictureURL: user.profilePictureURL,
+    };
+
     return {
       message: 'Logged in successfully',
       data: {
         token,
+        user: payload,
       },
+    };
+  }
+
+  // resend otp service
+  async resendOtp(dto: ResendOtpDto) {
+    const user = await this.findUser('email', dto.email);
+    const otp = this.generateOtp(4);
+    const hashOtp = this.hashOtp(otp);
+    const otpExpiry = this.getOtpExpiry();
+
+    if (user.isOtpVerified)
+      throw new BadRequestException('Account already verified');
+
+    if (!user.isOtpVerified && (user.otpAttempts ?? 0) === 3) {
+      await this.prisma.user.delete({ where: { email: dto.email } });
+      throw new BadRequestException(
+        'Max OTP attempts exceeded, please register again',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { email: dto.email },
+      data: {
+        otp: hashOtp,
+        otpAttempts: { increment: 1 },
+        otpExpires: otpExpiry,
+      },
+    });
+
+    const isMailSent = await this.email.sendEmail({
+      to: user.email as string,
+      subject: `Account verification otp  ${process.env.MAIL_FROM_NAME as string}`,
+      html: accountVerificationTemplate({
+        name: user.name as string,
+        email: user.email as string,
+        otp: otp,
+      }),
+    });
+
+    if (!isMailSent) {
+      throw new InternalServerErrorException(
+        "Something went wrong, can't sent resend otp at the moment",
+      );
+    }
+
+    return {
+      message: 'Email otp sent successfully, please check your mailbox',
+      data: null,
     };
   }
 }

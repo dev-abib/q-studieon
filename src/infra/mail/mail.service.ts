@@ -41,7 +41,7 @@ export class EmailService implements OnModuleInit {
     } as nodemailer.TransportOptions);
   }
 
-  async sendEmail(options: SendMailOptions): Promise<void> {
+  async sendEmail(options: SendMailOptions): Promise<boolean> {
     try {
       await this.transporter.sendMail({
         from: `${process.env.MAIL_FROM_NAME as string} <${process.env.MAIL_FROM_ADDRESS as string}>`,
@@ -49,6 +49,7 @@ export class EmailService implements OnModuleInit {
         subject: options.subject,
         html: options.html,
       });
+      return true;
     } catch (error) {
       console.error('Email send failed:', error);
       throw new InternalServerErrorException('Failed to send email');
