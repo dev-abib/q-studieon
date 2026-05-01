@@ -15,6 +15,7 @@ import { VerifyDto } from '../dto/verify-otp.dto';
 import { LoginDto } from '../dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { StringValue } from 'ms';
+import { JwtPayload } from '../types/jwt.types';
 
 @Injectable()
 export class AuthService {
@@ -146,11 +147,7 @@ export class AuthService {
 
   // token generate helper
   private generateToken(
-    payload: {
-      sub: string;
-      email: string;
-      role: 'user' | 'admin' | 'super_admin';
-    },
+    payload: JwtPayload,
     userType: 'user' | 'admin',
     tokenType: 'access' | 'refresh',
   ): string {
@@ -160,6 +157,23 @@ export class AuthService {
       secret: config.secret,
       expiresIn: config.expiresIn,
     });
+  }
+
+  // verify token helper
+  private verifyToken(
+    token: string,
+    type: 'user' | 'admin',
+    tokenType: 'access' | 'refresh',
+  ): any {
+    const config = this.getJwtConfig(type, tokenType);
+
+    try {
+      return this.jwt.verify(token, {
+        secret: config.secret,
+      });
+    } catch {
+      throw new BadRequestException('Invalid or expired token');
+    }
   }
 
   // register account service
@@ -266,5 +280,32 @@ export class AuthService {
 
     if (!isValidPass)
       throw new UnauthorizedException('Invalid email or password');
+
+    const token = this.generateToken(
+      {
+        name: user.name as string,
+        email: user.email as string,
+        id: user.id,
+        isGuest: user.isGuest as boolean,
+        isPaid: user.isPaid as boolean,
+        role: user.role,
+      },
+      'user',
+      'access',
+    );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: token,
+      },
+    });
+
+    return {
+      message: 'Logged in successfully',
+      data: {
+        token,
+      },
+    };
   }
 }
