@@ -13,13 +13,15 @@ import { accountVerificationTemplate } from 'src/infra/mail/templates/auth/accou
 import { randomBytes, createHash } from 'crypto';
 import { VerifyDto } from '../dto/verify-otp.dto';
 import { LoginDto } from '../dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { StringValue } from 'ms';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
-    // private readonly jwt: JwtService,
+    private readonly jwt: JwtService,
   ) {}
 
   // otp generator helper
@@ -63,6 +65,19 @@ export class AuthService {
     return await bcrypt.compare(password, hashPassword);
   }
 
+  // validate get expire in
+  private getExpiresIn(value: string | undefined): string {
+    if (!value) throw new Error('Missing JWT expiresIn env');
+    return value;
+  }
+
+  private env(value: string | undefined, name: string): string {
+    if (!value) {
+      throw new Error(`Missing env: ${name}`);
+    }
+    return value;
+  }
+
   // find user helper
   private async findUser(
     type: 'email' | 'id' = 'email',
@@ -73,11 +88,85 @@ export class AuthService {
     });
   }
 
+  private getJwtConfig(
+    type: 'user' | 'admin' | 'reset',
+    token: 'access' | 'refresh',
+  ): { secret: string; expiresIn: StringValue } {
+    if (type === 'user') {
+      return {
+        secret:
+          token === 'access'
+            ? this.env(process.env.JWT_ACCESS_SECRET, 'JWT_ACCESS_SECRET')
+            : this.env(process.env.JWT_REFRESH_SECRET, 'JWT_REFRESH_SECRET'),
+
+        expiresIn:
+          token === 'access'
+            ? (this.env(
+                process.env.JWT_ACCESS_EXPIRES_IN,
+                'JWT_ACCESS_EXPIRES_IN',
+              ) as StringValue)
+            : (this.env(
+                process.env.JWT_REFRESH_EXPIRES_IN,
+                'JWT_REFRESH_EXPIRES_IN',
+              ) as StringValue),
+      };
+    }
+
+    if (type === 'admin') {
+      return {
+        secret:
+          token === 'access'
+            ? this.env(process.env.JWT_ADMIN_SECRET, 'JWT_ADMIN_SECRET')
+            : this.env(
+                process.env.JWT_ADMIN_REFRESH_SECRET,
+                'JWT_ADMIN_REFRESH_SECRET',
+              ),
+
+        expiresIn:
+          token === 'access'
+            ? (this.env(
+                process.env.JWT_ADMIN_EXPIRES_IN,
+                'JWT_ADMIN_EXPIRES_IN',
+              ) as StringValue)
+            : (this.env(
+                process.env.JWT_ADMIN_REFRESH_EXPIRES_IN,
+                'JWT_ADMIN_REFRESH_EXPIRES_IN',
+              ) as StringValue),
+      };
+    }
+
+    return {
+      secret: this.env(process.env.JWT_RESET_SECRET, 'JWT_RESET_SECRET'),
+      expiresIn: this.env(
+        process.env.JWT_RESET_EXPIRES_IN,
+        'JWT_RESET_EXPIRES_IN',
+      ) as StringValue,
+    };
+  }
+
+  // token generate helper
+  private generateToken(
+    payload: {
+      sub: string;
+      email: string;
+      role: 'user' | 'admin' | 'super_admin';
+    },
+    userType: 'user' | 'admin',
+    tokenType: 'access' | 'refresh',
+  ): string {
+    const config = this.getJwtConfig(userType, tokenType);
+
+    return this.jwt.sign(payload, {
+      secret: config.secret,
+      expiresIn: config.expiresIn,
+    });
+  }
+
   // register account service
   async register(dto: RegisterDto) {
     const existing = await this.findUser('email', dto.email);
 
-    if (!existing) {
+    if (existing) {
       throw new ConflictException('Email already in use.');
     }
 
