@@ -21,6 +21,7 @@ import { VerifyAccountDto } from '../dto/verify-account.dto';
 import { ResendOtpDto } from '../dto/resend-otp';
 import { accountVerificationConfirmationTemplate } from 'src/infra/mail/templates/system/account-verification-confirmation.template';
 import { resetPasswordTemplate } from 'src/infra/mail/templates/auth/reset-password.template';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -484,6 +485,13 @@ export class AuthService {
       data: {
         token,
       },
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto, user: JwtPayload) {
+    await this.findUser('id', user.id);
+    return {
+      message: 'working',
     };
   }
 }

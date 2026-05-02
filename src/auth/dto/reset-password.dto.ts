@@ -1,19 +1,7 @@
-import {
-  IsEmail,
-  IsString,
-  MinLength,
-  IsOptional,
-  MaxLength,
-  Matches,
-  IsBoolean,
-  Equals,
-} from 'class-validator';
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Match } from '../decorators/match.decorator';
 
-export class RegisterDto {
-  @IsEmail()
-  email: string;
-
+export class ResetPasswordDto {
   @IsString()
   @MinLength(8)
   @MaxLength(32)
@@ -26,11 +14,4 @@ export class RegisterDto {
   @IsString()
   @Match('password', { message: 'Passwords do not match' })
   confirmPassword: string;
-
-  @IsOptional()
-  name: string;
-
-  @IsBoolean()
-  @Equals(true, { message: 'You must have to accept the terms and conditions' })
-  termsAndConditions: boolean;
 }

@@ -66,7 +66,11 @@ export class AuthGuard implements CanActivate {
 
     try {
       decoded = this.jwt.verify(token, { secret });
-    } catch {
+      console.log(decoded);
+    } catch (err: unknown) {
+      console.log('secret used:', secret);
+      console.log('token:', token);
+      console.log('error:', err);
       throw new UnauthorizedException('Invalid or expired token');
     }
 
@@ -96,12 +100,9 @@ export class AuthGuard implements CanActivate {
   }
 
   private getSecret(type: AuthType): string {
-    const secrets: Record<AuthType, string> = {
-      user: getEnv('JWT_ACCESS_SECRET'),
-      admin: getEnv('JWT_ADMIN_SECRET'),
-      reset: getEnv('JWT_RESET_SECRET'),
-    };
-
-    return secrets[type];
+    if (type === 'user') return getEnv('JWT_ACCESS_SECRET');
+    if (type === 'admin') return getEnv('JWT_ADMIN_SECRET');
+    if (type === 'reset') return getEnv('JWT_RESET_SECRET');
+    throw new UnauthorizedException('Unknown auth type');
   }
 }
