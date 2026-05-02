@@ -22,6 +22,9 @@ import { ResendOtpDto } from '../dto/resend-otp';
 import { accountVerificationConfirmationTemplate } from 'src/infra/mail/templates/system/account-verification-confirmation.template';
 import { resetPasswordTemplate } from 'src/infra/mail/templates/auth/reset-password.template';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
+import { resetPasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/reset-password-confirmation.template';
+import { ChangePasswordDto } from '../dto/change-password.dto';
+import { changePasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/change-password-confirmation.template';
 
 @Injectable()
 export class AuthService {
@@ -421,7 +424,7 @@ export class AuthService {
 
     const isMailSent = await this.email.sendEmail({
       to: user.email as string,
-      subject: `Account verification otp  ${process.env.MAIL_FROM_NAME as string}`,
+      subject: `Forgot password otp  ${process.env.MAIL_FROM_NAME as string}`,
       html: resetPasswordTemplate({
         name: user.name as string,
         email: user.email as string,
@@ -442,6 +445,7 @@ export class AuthService {
     };
   }
 
+  // verify otp service
   async verifyOtp(dto: VerifyAccountDto) {
     const user = await this.findUser('email', dto.email);
 
@@ -488,10 +492,82 @@ export class AuthService {
     };
   }
 
+  // reset password service
   async resetPassword(dto: ResetPasswordDto, user: JwtPayload) {
     await this.findUser('id', user.id);
+
+    const hashedPassword = await this.hashPassword(dto.password);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    const isMailSent = await this.email.sendEmail({
+      to: user.email,
+      subject: `Password reset confirmation  ${process.env.MAIL_FROM_NAME as string}`,
+      html: resetPasswordConfirmationTemplate({
+        name: user.name,
+      }),
+    });
+
+    if (!isMailSent) {
+      throw new InternalServerErrorException(
+        "Something went wrong, can't sent otp at the moment",
+      );
+    }
+
     return {
-      message: 'working',
+      message: 'Password reset successful.',
+      data: null,
+    };
+  }
+
+  // change password service
+  async changePassword(dto: ChangePasswordDto, user: JwtPayload) {
+    const existingUser = await this.findUser('id', user.id);
+
+    if (!existingUser.password) {
+      throw new BadRequestException('No password set for this account');
+    }
+
+    const isValidPass = await this.comparePassword(
+      dto.oldPassword,
+      existingUser.password,
+    );
+
+    if (!isValidPass) {
+      throw new BadRequestException('Old password is incorrect');
+    }
+
+    const hashPassword = await this.hashPassword(dto.password);
+
+    await this.prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        password: hashPassword,
+      },
+    });
+
+    const isMailSent = await this.email.sendEmail({
+      to: user.email,
+      subject: `Password change confirmation  ${process.env.MAIL_FROM_NAME as string}`,
+      html: changePasswordConfirmationTemplate({
+        name: user.name,
+      }),
+    });
+
+    if (!isMailSent) {
+      throw new InternalServerErrorException(
+        "Something went wrong, can't sent otp at the moment",
+      );
+    }
+
+    return {
+      message: 'Password changed successfully.',
+      data: null,
     };
   }
 }

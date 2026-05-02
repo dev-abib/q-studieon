@@ -9,6 +9,7 @@ import { Auth } from './decorators/auth.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { JwtPayload } from './types/jwt.types';
 import { Public } from './decorators/public.decorator';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -52,10 +53,20 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(200)
   @Auth('reset')
-  ResetPassword(
+  resetPassword(
     @Body() dto: ResetPasswordDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.authService.resetPassword(dto, user);
+  }
+
+  @Post('change-password')
+  @HttpCode(200)
+  @Auth('user')
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.authService.changePassword(dto, user);
   }
 }

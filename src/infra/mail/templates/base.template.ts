@@ -4,7 +4,7 @@ import { BaseEmailProps } from './template.type';
 
 export const baseTemplate = ({ title, content }: BaseEmailProps): string => {
   const year = new Date().getFullYear();
-  const siteName = process.env.SITE_NAME ?? 'Q Studieon';
+  const siteName = (process.env.MAIL_FROM_NAME as string) ?? 'Q Studieon';
   const siteUrl = process.env.SITE_URL ?? '#';
 
   return `

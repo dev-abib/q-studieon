@@ -66,11 +66,7 @@ export class AuthGuard implements CanActivate {
 
     try {
       decoded = this.jwt.verify(token, { secret });
-      console.log(decoded);
     } catch (err: unknown) {
-      console.log('secret used:', secret);
-      console.log('token:', token);
-      console.log('error:', err);
       throw new UnauthorizedException('Invalid or expired token');
     }
 
