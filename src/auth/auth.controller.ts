@@ -23,13 +23,19 @@ export class AuthController {
 
   @Post('verify-account')
   @HttpCode(200)
-  VerifyOtp(@Body() dto: VerifyAccountDto) {
+  verifyAccount(@Body() dto: VerifyAccountDto) {
     return this.authService.verifyAccount(dto);
   }
 
-  @Post('resend-otp')
+  @Post('forgot-password')
   @HttpCode(200)
-  ResendOtp(@Body() dto: ResendOtpDto) {
-    return this.authService.resendOtp(dto);
+  forgotPassword(@Body() dto: ResendOtpDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('verify-otp')
+  @HttpCode(200)
+  verifyOtp(@Body() dto: VerifyAccountDto) {
+    return this.authService.verifyOtp(dto);
   }
 }

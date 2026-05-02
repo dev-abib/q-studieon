@@ -61,6 +61,7 @@ model User {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   termsAndConditions Boolean  @default(false)
+blockedUntil DateTime?
 
   @@map("users")
 }

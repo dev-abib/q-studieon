@@ -20,6 +20,7 @@ import { JwtPayload } from '../types/jwt.types';
 import { VerifyAccountDto } from '../dto/verify-account.dto';
 import { ResendOtpDto } from '../dto/resend-otp';
 import { accountVerificationConfirmationTemplate } from 'src/infra/mail/templates/system/account-verification-confirmation.template';
+import { resetPasswordTemplate } from 'src/infra/mail/templates/auth/reset-password.template';
 
 @Injectable()
 export class AuthService {
@@ -88,7 +89,7 @@ export class AuthService {
     });
 
     if (!user)
-      throw new BadRequestException(
+      throw new NotFoundException(
         ' User not found, account removed or deleted,',
       );
 
@@ -154,7 +155,7 @@ export class AuthService {
   // token generate helper
   private generateToken(
     payload: JwtPayload,
-    userType: 'user' | 'admin',
+    userType: 'user' | 'admin' | 'reset',
     tokenType: 'access' | 'refresh',
   ): string {
     const config = this.getJwtConfig(userType, tokenType);
@@ -168,7 +169,7 @@ export class AuthService {
   // verify token helper
   private verifyToken(
     token: string,
-    type: 'user' | 'admin',
+    type: 'user' | 'admin' | 'reset',
     tokenType: 'access' | 'refresh',
   ): any {
     const config = this.getJwtConfig(type, tokenType);
@@ -190,7 +191,7 @@ export class AuthService {
       },
     });
 
-    if (isExisting) throw new BadRequestException('Account already exists');
+    if (isExisting) throw new ConflictException('Account already exists');
 
     const otp = this.generateOtp();
     const otpExpiry = this.getOtpExpiry();
@@ -374,6 +375,115 @@ export class AuthService {
     return {
       message: 'Email otp sent successfully, please check your mailbox',
       data: null,
+    };
+  }
+
+  // forgot password service
+  async forgotPassword(dto: ResendOtpDto) {
+    const user = await this.findUser('email', dto.email);
+
+    const otp = this.generateOtp(4);
+    const hashOtp = this.hashOtp(otp);
+    const otpExpiry = this.getOtpExpiry();
+
+    if (!user.isOtpVerified) {
+      throw new UnauthorizedException(
+        'To reset your password , you must have to verify you account at first',
+      );
+    }
+
+    if ((user.otpAttempts ?? 0) >= 3) {
+      const blockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+
+      await this.prisma.user.update({
+        where: { email: dto.email },
+        data: {
+          blockedUntil,
+          otpAttempts: 0,
+        },
+      });
+
+      throw new BadRequestException(
+        'Too many attempts. Your account is blocked for 15 minutes.',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { email: dto.email },
+      data: {
+        otp: hashOtp,
+        otpAttempts: { increment: 1 },
+        otpExpires: otpExpiry,
+        blockedUntil: null,
+      },
+    });
+
+    const isMailSent = await this.email.sendEmail({
+      to: user.email as string,
+      subject: `Account verification otp  ${process.env.MAIL_FROM_NAME as string}`,
+      html: resetPasswordTemplate({
+        name: user.name as string,
+        email: user.email as string,
+        otp: otp,
+      }),
+    });
+
+    if (!isMailSent) {
+      throw new InternalServerErrorException(
+        "Something went wrong, can't sent otp at the moment",
+      );
+    }
+
+    return {
+      message:
+        'Forgot password otp sent successfully, please check your mailbox',
+      data: null,
+    };
+  }
+
+  async verifyOtp(dto: VerifyAccountDto) {
+    const user = await this.findUser('email', dto.email);
+
+    if (user.otpExpires && user.otpExpires < new Date())
+      throw new BadRequestException('Otp expired');
+
+    const isMatch = this.compareOtp(dto.otp, user.otp as string);
+    if (!isMatch) {
+      await this.prisma.user.update({
+        where: { email: dto.email },
+        data: { otpAttempts: { increment: 1 }, otpExpires: null, otp: null },
+      });
+      throw new BadRequestException('Invalid otp');
+    }
+
+    const token = this.generateToken(
+      {
+        name: user.name as string,
+        email: user.email as string,
+        id: user.id,
+        isGuest: user.isGuest as boolean,
+        isPaid: user.isPaid as boolean,
+        role: user.role,
+      },
+      'reset',
+      'refresh',
+    );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: token,
+        otp: null,
+        otpExpires: null,
+        otpAttempts: 0,
+      },
+    });
+
+    return {
+      message: 'otp verified successfully',
+      data: {
+        token,
+      },
     };
   }
 }

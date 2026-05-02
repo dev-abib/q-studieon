@@ -21,7 +21,8 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "types": ["node", "jest"],
-    "esModuleInterop": true
-  }
+    "types": ["node", "jest", "express"],
+    "typeRoots": ["./src/types", "./node_modules/@types"]
+  },
+  "include": ["src/**/*", "src/types/express.d.ts"]
 }
