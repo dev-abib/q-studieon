@@ -9,6 +9,7 @@ import {
   Equals,
 } from 'class-validator';
 import { Match } from '../decorators/match.decorator';
+import { Optional } from '@nestjs/common';
 
 export class RegisterDto {
   @IsEmail()
@@ -33,4 +34,8 @@ export class RegisterDto {
   @IsBoolean()
   @Equals(true, { message: 'You must have to accept the terms and conditions' })
   termsAndConditions: boolean;
+
+  @IsString()
+  @Optional()
+  guestId: string;
 }

@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { AUTH_TYPE_KEY } from '../decorators/auth.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { NO_GUEST_KEY } from '../decorators/no-guest.decorator';
 import { JwtPayload } from './../types/jwt.types';
 
 type AuthType = 'user' | 'admin' | 'reset';
@@ -72,6 +73,15 @@ export class AuthGuard implements CanActivate {
 
     if (!isJwtPayload(decoded)) {
       throw new UnauthorizedException('Malformed token payload');
+    }
+
+    const noGuest: unknown = this.reflector.getAllAndOverride(NO_GUEST_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (noGuest === true && decoded.isGuest === true) {
+      throw new UnauthorizedException('Guests cannot access this route');
     }
 
     if (

@@ -25,7 +25,8 @@ import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { resetPasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/reset-password-confirmation.template';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { changePasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/change-password-confirmation.template';
-
+import crypto from 'crypto';
+import { getuid } from 'process';
 @Injectable()
 export class AuthService {
   constructor(
@@ -202,41 +203,91 @@ export class AuthService {
     const hashOtp = this.hashOtp(otp);
     const hashPassword = await this.hashPassword(dto.password);
 
-    const user = await this.prisma.user.create({
+    let user: User;
+
+    if (dto.guestId) {
+      user = await this.prisma.user.update({
+        where: { id: dto.guestId },
+        data: {
+          email: dto.email,
+          name: dto.name,
+          password: hashPassword,
+          authProvider: 'local',
+          otp: hashOtp,
+          otpExpires: otpExpiry,
+          termsAndConditions: dto.termsAndConditions,
+          role: 'user',
+          otpAttempts: 0,
+          isGuest: false,
+          guestIp: null,
+          guestDeviceId: null,
+          guestExpiresAt: null,
+        },
+      });
+    } else {
+      user = await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          name: dto.name,
+          password: hashPassword,
+          authProvider: 'local',
+          otp: hashOtp,
+          otpExpires: otpExpiry,
+          termsAndConditions: dto.termsAndConditions,
+          role: 'user',
+          otpAttempts: 0,
+        },
+      });
+    }
+
+    const payload = {
+      name: user.name as string,
+      email: user.email as string,
+      id: user.id,
+      isGuest: user.isGuest as boolean,
+      isPaid: user.isPaid as boolean,
+      role: user.role,
+    };
+
+    const accessToken = this.generateToken(payload, 'user', 'access');
+    const refreshToken = this.generateToken(payload, 'user', 'refresh');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
       data: {
-        email: dto.email,
-        name: dto.name,
-        password: hashPassword,
-        authProvider: 'local',
-        otp: hashOtp,
-        otpExpires: otpExpiry,
-        termsAndConditions: dto.termsAndConditions,
-        role: 'user',
-        otpAttempts: 0,
-      },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-        email: true,
+        refreshToken: refreshToken,
       },
     });
 
-    const isMailSent = await this.email.sendEmail({
-      to: user.email as string,
-      subject: `Account verification otp ${process.env.MAIL_FROM_NAME as string}`,
-      html: accountVerificationTemplate({
-        name: user.name as string,
-        email: user.email as string,
-        otp: otp,
-      }),
-    });
+    let isMailSent: boolean = false;
+
+    if (!user.isGuest) {
+      isMailSent = await this.email.sendEmail({
+        to: user.email as string,
+        subject: `Account verification otp ${process.env.MAIL_FROM_NAME as string}`,
+        html: accountVerificationTemplate({
+          name: user.name as string,
+          email: user.email as string,
+          otp: otp,
+        }),
+      });
+    }
 
     return {
       message: isMailSent
         ? 'Account created successfully and sent account verification mail.'
         : `Account created successfully, can't send otp at the moment. Please try again later`,
-      data: user,
+      data: {
+        name: user.name,
+        email: user.email,
+        profilePicture: user.profilePictureURL,
+        id: user.id,
+        isGuest: user.isGuest,
+        token: {
+          accessToken,
+          refreshToken,
+        },
+      },
     };
   }
 
@@ -299,27 +350,26 @@ export class AuthService {
         'Before login , please verify you account',
       );
 
-    const token = this.generateToken(
-      {
-        name: user.name as string,
-        email: user.email as string,
-        id: user.id,
-        isGuest: user.isGuest as boolean,
-        isPaid: user.isPaid as boolean,
-        role: user.role,
-      },
-      'user',
-      'access',
-    );
+    const payload = {
+      name: user.name as string,
+      email: user.email as string,
+      id: user.id,
+      isGuest: user.isGuest as boolean,
+      isPaid: user.isPaid as boolean,
+      role: user.role,
+    };
+
+    const accessToken = this.generateToken(payload, 'user', 'access');
+    const refreshToken = this.generateToken(payload, 'user', 'refresh');
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        refreshToken: token,
+        refreshToken: refreshToken,
       },
     });
 
-    const payload = {
+    const data = {
       name: user.name,
       email: user.email,
       profilePictureURL: user.profilePictureURL,
@@ -328,8 +378,11 @@ export class AuthService {
     return {
       message: 'Logged in successfully',
       data: {
-        token,
-        user: payload,
+        token: {
+          accessToken,
+          refreshToken,
+        },
+        user: data,
       },
     };
   }
@@ -568,6 +621,115 @@ export class AuthService {
     return {
       message: 'Password changed successfully.',
       data: null,
+    };
+  }
+  // guest login service
+  async guestLogin(ip: string, deviceId: string) {
+    if (!deviceId) {
+      throw new BadRequestException('Device ID is required');
+    }
+
+    const normalizedIp = ip === '::1' ? '127.0.0.1' : ip;
+
+    // find by deviceId instead of IP
+    const existingGuest = await this.prisma.user.findFirst({
+      where: {
+        isGuest: true,
+        guestDeviceId: deviceId,
+        guestExpiresAt: { gt: new Date() },
+      },
+    });
+
+    if (existingGuest) {
+      const payload: JwtPayload = {
+        id: existingGuest.id,
+        email: existingGuest.email as string,
+        name: existingGuest.name as string,
+        role: existingGuest.role,
+        isGuest: true,
+        isPaid: false,
+      };
+
+      const accessToken = this.generateToken(payload, 'user', 'access');
+      const refreshToken = this.generateToken(payload, 'user', 'refresh');
+
+      await this.prisma.user.update({
+        where: { id: existingGuest.id },
+        data: { refreshToken },
+      });
+
+      return {
+        message: 'Guest session restored',
+        data: {
+          accessToken,
+          refreshToken,
+          expiresAt: existingGuest.guestExpiresAt,
+          id: existingGuest.id,
+        },
+      };
+    }
+
+    const guestId = crypto.randomBytes(8).toString('hex');
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: `guest_${guestId}@guest.local`,
+        name: `Guest_${guestId.slice(0, 6)}`,
+        isGuest: true,
+        isPaid: false,
+        isOtpVerified: false,
+        authProvider: 'guest',
+        guestIp: normalizedIp,
+        guestDeviceId: deviceId,
+        guestExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const payload: JwtPayload = {
+      id: user.id,
+      email: user.email as string,
+      name: user.name as string,
+      role: user.role,
+      isGuest: true,
+      isPaid: false,
+    };
+
+    const accessToken = this.generateToken(payload, 'user', 'access');
+    const refreshToken = this.generateToken(payload, 'user', 'refresh');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken },
+    });
+
+    return {
+      message: 'Guest login successful',
+      data: {
+        accessToken,
+        refreshToken,
+        expiresAt: user.guestExpiresAt,
+        id: user.id,
+      },
+    };
+  }
+
+  // get me service
+  async getMe(id: string) {
+    const user = await this.findUser('id', id);
+
+    const {
+      password,
+      otp,
+      otpAttempts,
+      otpExpires,
+      refreshToken,
+      resetToken,
+      ...safeUser
+    } = user;
+
+    return {
+      message: 'User extracted successfully',
+      data: safeUser,
     };
   }
 }
