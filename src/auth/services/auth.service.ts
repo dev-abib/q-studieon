@@ -30,12 +30,14 @@ import { GoogleUserInfo } from '../types/google-paylod';
 import axios from 'axios';
 import appleSignin from 'apple-signin-auth';
 import { AppleUserInfo } from '../types/apple-user-info';
+import { UserRepository } from 'src/common/repositories/user.repository';
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly jwt: JwtService,
+    private readonly userRepo: UserRepository,
   ) {}
 
   // otp generator helper
@@ -85,23 +87,6 @@ export class AuthService {
       throw new Error(`Missing env: ${name}`);
     }
     return value;
-  }
-
-  // find user helper
-  private async findUser(
-    type: 'email' | 'id' = 'email',
-    payload: string,
-  ): Promise<User> {
-    const user = await this.prisma.user.findUnique({
-      where: type === 'email' ? { email: payload } : { id: payload },
-    });
-
-    if (!user)
-      throw new NotFoundException(
-        ' User not found, account removed or deleted,',
-      );
-
-    return user;
   }
 
   private getJwtConfig(
@@ -237,7 +222,6 @@ export class AuthService {
   }
 
   // services
-
   // register account service
   async register(dto: RegisterDto) {
     const isExisting = await this.prisma.user.findUnique({
@@ -343,7 +327,7 @@ export class AuthService {
 
   // verify account service
   async verifyAccount(dto: VerifyAccountDto) {
-    const user = await this.findUser('email', dto.email);
+    const user = await this.userRepo.findUser('email', dto.email);
 
     if (user.isOtpVerified)
       throw new BadRequestException('Account already verified');
@@ -385,7 +369,7 @@ export class AuthService {
 
   // login account service
   async loginAccount(dto: LoginDto) {
-    const user = await this.findUser('email', dto.email);
+    const user = await this.userRepo.findUser('email', dto.email);
 
     const isValidPass = await this.comparePassword(
       dto.password,
@@ -439,7 +423,7 @@ export class AuthService {
 
   // resend otp service
   async resendOtp(dto: ResendOtpDto) {
-    const user = await this.findUser('email', dto.email);
+    const user = await this.userRepo.findUser('email', dto.email);
     const otp = this.generateOtp(4);
     const hashOtp = this.hashOtp(otp);
     const otpExpiry = this.getOtpExpiry();
@@ -487,7 +471,7 @@ export class AuthService {
 
   // forgot password service
   async forgotPassword(dto: ResendOtpDto) {
-    const user = await this.findUser('email', dto.email);
+    const user = await this.userRepo.findUser('email', dto.email);
 
     const otp = this.generateOtp(4);
     const hashOtp = this.hashOtp(otp);
@@ -550,7 +534,7 @@ export class AuthService {
 
   // verify otp service
   async verifyOtp(dto: VerifyAccountDto) {
-    const user = await this.findUser('email', dto.email);
+    const user = await this.userRepo.findUser('email', dto.email);
 
     if (user.otpExpires && user.otpExpires < new Date())
       throw new BadRequestException('Otp expired');
@@ -597,7 +581,7 @@ export class AuthService {
 
   // reset password service
   async resetPassword(dto: ResetPasswordDto, user: JwtPayload) {
-    await this.findUser('id', user.id);
+    await this.userRepo.findUser('id', user.id);
 
     const hashedPassword = await this.hashPassword(dto.password);
 
@@ -630,7 +614,7 @@ export class AuthService {
 
   // change password service
   async changePassword(dto: ChangePasswordDto, user: JwtPayload) {
-    const existingUser = await this.findUser('id', user.id);
+    const existingUser = await this.userRepo.findUser('id', user.id);
 
     if (!existingUser.password) {
       throw new BadRequestException('No password set for this account');
@@ -760,26 +744,6 @@ export class AuthService {
         expiresAt: user.guestExpiresAt,
         id: user.id,
       },
-    };
-  }
-
-  // get me service
-  async getMe(id: string) {
-    const user = await this.findUser('id', id);
-
-    const {
-      password,
-      otp,
-      otpAttempts,
-      otpExpires,
-      refreshToken,
-      resetToken,
-      ...safeUser
-    } = user;
-
-    return {
-      message: 'User extracted successfully',
-      data: safeUser,
     };
   }
 

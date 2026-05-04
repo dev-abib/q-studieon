@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  Ip,
-  Post,
-  Headers,
-  Get,
-  Param,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, Ip, Post, Headers } from '@nestjs/common';
 import { AuthService } from './services/auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -19,7 +10,6 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import type { JwtPayload } from './types/jwt.types';
 import { Public } from './decorators/public.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { NoGuest } from './decorators/no-guest.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -85,21 +75,6 @@ export class AuthController {
   @Public()
   guestLogin(@Ip() ip: string, @Headers('x-device-id') deviceId: string) {
     return this.authService.guestLogin(ip, deviceId);
-  }
-
-  @Get('get-me')
-  @HttpCode(200)
-  @Auth('user')
-  getMe(@CurrentUser() user: JwtPayload) {
-    return this.authService.getMe(user.id);
-  }
-
-  @Get('user/:id')
-  @HttpCode(200)
-  @Auth('user')
-  @NoGuest()
-  getUserById(@Param('id') id: string) {
-    return this.authService.getMe(id);
   }
 
   @Post('google-login')

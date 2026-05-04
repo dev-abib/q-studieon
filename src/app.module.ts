@@ -7,13 +7,17 @@ import { ConfigModule } from '@nestjs/config';
 
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './infra/mail/mail.module';
+import { UserModule } from './user/user.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CommonModule,
     PrismaModule,
     AuthModule,
     MailModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
