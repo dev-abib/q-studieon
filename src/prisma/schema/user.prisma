@@ -63,7 +63,7 @@ model User {
   termsAndConditions Boolean  @default(false)
   blockedUntil DateTime?
   guestIp      String?
-  guestDeviceId  String?
+  guestDeviceId  String? 
 
   @@map("users")
 }

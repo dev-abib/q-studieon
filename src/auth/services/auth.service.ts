@@ -26,7 +26,8 @@ import { resetPasswordConfirmationTemplate } from 'src/infra/mail/templates/auth
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { changePasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/change-password-confirmation.template';
 import crypto from 'crypto';
-import { getuid } from 'process';
+import { GoogleUserInfo } from '../types/google-paylod';
+import axios from 'axios';
 @Injectable()
 export class AuthService {
   constructor(
@@ -185,6 +186,28 @@ export class AuthService {
       });
     } catch {
       throw new BadRequestException('Invalid or expired token');
+    }
+  }
+
+  // verify google access token
+  private async verifyGoogleAccessToken(
+    access_token: string,
+  ): Promise<GoogleUserInfo> {
+    try {
+      const res = await axios.get<GoogleUserInfo>(
+        'https://www.googleapis.com/oauth2/v3/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
+      return res.data;
+    } catch (error) {
+      console.log(error);
+      throw new InternalServerErrorException(
+        `Something went wrong, can't login at the moment `,
+      );
     }
   }
 
@@ -730,6 +753,77 @@ export class AuthService {
     return {
       message: 'User extracted successfully',
       data: safeUser,
+    };
+  }
+
+  //  google login service
+  async googleLogin(token: string) {
+    const res = await this.verifyGoogleAccessToken(token);
+    const { name, email, email_verified, picture } = res;
+
+    let user = await this.prisma.user.findUnique({
+      where: { email: email },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: email,
+          name: name,
+          profilePictureURL: picture,
+          profilePicturePublicId: null,
+          isOtpVerified: true,
+          authProvider: 'google',
+          termsAndConditions: true,
+          role: 'user',
+          otpAttempts: 0,
+          password: crypto.randomBytes(32).toString('hex'),
+        },
+      });
+    }
+
+    const payload = {
+      name: user.name as string,
+      email: user.email as string,
+      id: user.id,
+      isGuest: user.isGuest as boolean,
+      isPaid: user.isPaid as boolean,
+      role: user.role,
+    };
+
+    const accessToken = this.generateToken(payload, 'user', 'access');
+    const refreshToken = this.generateToken(payload, 'user', 'refresh');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: refreshToken,
+      },
+    });
+
+    const data = {
+      name: user.name,
+      email: user.email,
+      profilePictureURL: user.profilePictureURL,
+    };
+
+    await this.email.sendEmail({
+      to: user.email as string,
+      subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
+      html: accountVerificationConfirmationTemplate({
+        name: user.name as string,
+      }),
+    });
+
+    return {
+      message: 'Google log in successfull',
+      data: {
+        token: {
+          accessToken,
+          refreshToken,
+        },
+        user: data,
+      },
     };
   }
 }

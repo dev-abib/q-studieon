@@ -1,4 +1,4 @@
-import { IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Match } from '../decorators/match.decorator';
 
 export class ChangePasswordDto {

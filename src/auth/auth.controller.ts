@@ -101,4 +101,11 @@ export class AuthController {
   getUserById(@Param('id') id: string) {
     return this.authService.getMe(id);
   }
+
+  @Post('google-login')
+  @HttpCode(200)
+  @Public()
+  googleLogin(@Body('token') token: string) {
+    return this.authService.googleLogin(token);
+  }
 }
