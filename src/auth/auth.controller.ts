@@ -15,6 +15,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Register controller
   @Post('register')
   @HttpCode(201)
   @Public()
@@ -22,6 +23,7 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  // login controller
   @Post('login')
   @HttpCode(200)
   @Public()
@@ -29,6 +31,7 @@ export class AuthController {
     return this.authService.loginAccount(dto);
   }
 
+  // Verify account controller
   @Post('verify-account')
   @HttpCode(200)
   @Public()
@@ -36,6 +39,7 @@ export class AuthController {
     return this.authService.verifyAccount(dto);
   }
 
+  // Forgot password controller
   @Post('forgot-password')
   @HttpCode(200)
   @Public()
@@ -43,6 +47,7 @@ export class AuthController {
     return this.authService.forgotPassword(dto);
   }
 
+  // Verify otp controller
   @Post('verify-otp')
   @HttpCode(200)
   @Public()
@@ -50,6 +55,7 @@ export class AuthController {
     return this.authService.verifyOtp(dto);
   }
 
+  // Reset password controller
   @Post('reset-password')
   @HttpCode(200)
   @Auth('reset')
@@ -60,6 +66,7 @@ export class AuthController {
     return this.authService.resetPassword(dto, user);
   }
 
+  // Change password controller
   @Post('change-password')
   @HttpCode(200)
   @Auth('user')
@@ -70,6 +77,7 @@ export class AuthController {
     return this.authService.changePassword(dto, user);
   }
 
+  // Guest login controller
   @Post('guest-login')
   @HttpCode(200)
   @Public()
@@ -77,6 +85,7 @@ export class AuthController {
     return this.authService.guestLogin(ip, deviceId);
   }
 
+  // Google login controller
   @Post('google-login')
   @HttpCode(200)
   @Public()
@@ -84,10 +93,19 @@ export class AuthController {
     return this.authService.googleLogin(token);
   }
 
-  @Post('google-login')
+  // Apple login controller
+  @Post('apple-login')
   @HttpCode(200)
   @Public()
   appleLogin(@Body('token') token: string) {
     return this.authService.appleLogin(token);
+  }
+
+  // log out controller
+  @Post('log-out')
+  @HttpCode(200)
+  @Auth('user')
+  logOut(@CurrentUser() user: JwtPayload) {
+    return this.authService.logOut(user.id);
   }
 }

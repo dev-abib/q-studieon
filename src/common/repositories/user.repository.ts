@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { User } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 @Injectable()
 export class UserRepository {
@@ -19,5 +20,12 @@ export class UserRepository {
       throw new NotFoundException('User not found, account removed or deleted');
 
     return user;
+  }
+
+  async comparePassword(
+    password: string,
+    hashPassword: string,
+  ): Promise<boolean> {
+    return await bcrypt.compare(password, hashPassword);
   }
 }

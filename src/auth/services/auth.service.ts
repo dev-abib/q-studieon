@@ -73,14 +73,6 @@ export class AuthService {
     return await bcrypt.hash(password, 10);
   }
 
-  // password compare helper
-  private async comparePassword(
-    password: string,
-    hashPassword: string,
-  ): Promise<boolean> {
-    return await bcrypt.compare(password, hashPassword);
-  }
-
   // validate env
   private env(value: string | undefined, name: string): string {
     if (!value) {
@@ -371,7 +363,7 @@ export class AuthService {
   async loginAccount(dto: LoginDto) {
     const user = await this.userRepo.findUser('email', dto.email);
 
-    const isValidPass = await this.comparePassword(
+    const isValidPass = await this.userRepo.comparePassword(
       dto.password,
       user.password as string,
     );
@@ -620,7 +612,7 @@ export class AuthService {
       throw new BadRequestException('No password set for this account');
     }
 
-    const isValidPass = await this.comparePassword(
+    const isValidPass = await this.userRepo.comparePassword(
       dto.oldPassword,
       existingUser.password,
     );
@@ -885,6 +877,28 @@ export class AuthService {
           refreshToken,
         },
         user: data,
+      },
+    };
+  }
+
+  // log out service
+  async logOut(id: string) {
+    const user = await this.userRepo.findUser('id', id);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: null,
+      },
+    });
+
+    return {
+      message: 'Log out successfully',
+      data: {
+        token: {
+          accessToken: null,
+          refreshToken: null,
+        },
       },
     };
   }

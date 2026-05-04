@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailService } from 'src/infra/mail/mail.service';
 import { UserRepository } from 'src/common/repositories/user.repository';
 import { CloudinaryService } from 'src/common/services/cloudinary.service';
 import { MulterFile } from 'src/common/pipes/file-validation.pipe';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 
 @Injectable()
 export class UserService {
@@ -82,7 +87,7 @@ export class UserService {
       otpExpires,
       refreshToken,
       resetToken,
-      profilePicturePublicId, 
+      profilePicturePublicId,
       ...safeUser
     } = updated;
 
@@ -90,5 +95,29 @@ export class UserService {
       message: 'Profile updated successfully',
       data: safeUser,
     };
+  }
+
+  // delete user service
+  async deleteUser(dto: DeleteAccountDto, id: string) {
+    const user = await this.userRepo.findUser('id', id);
+
+    const isValidPass = await this.userRepo.comparePassword(
+      dto.password,
+      user.password as string,
+    );
+
+    if (!isValidPass) {
+      throw new UnauthorizedException(
+        'Invalid password , please try again later',
+      );
+    }
+
+    if (user.profilePicturePublicId) {
+      await this.cloudinary.deleteFile(user.profilePicturePublicId);
+    }
+
+    await this.prisma.user.delete({
+      where: { id: id },
+    });
   }
 }
