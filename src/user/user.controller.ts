@@ -23,6 +23,7 @@ import {
   FileValidationPipe,
   type MulterFile,
 } from 'src/common/pipes/file-validation.pipe';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 
 @Controller('user')
 export class UserController {
@@ -66,5 +67,13 @@ export class UserController {
     }
 
     return this.user.updateUser(dto, user.id, profilePicture);
+  }
+
+  // delete user controller
+  @Delete('delete-account')
+  @Auth('user')
+  @NoGuest()
+  deleteUser(@Body() dto: DeleteAccountDto, @CurrentUser() user: JwtPayload) {
+    return this.user.deleteUser(dto, user.id);
   }
 }

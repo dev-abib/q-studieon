@@ -10,6 +10,7 @@ import { UserRepository } from 'src/common/repositories/user.repository';
 import { CloudinaryService } from 'src/common/services/cloudinary.service';
 import { MulterFile } from 'src/common/pipes/file-validation.pipe';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { deleteAccountConfirmationTemplate } from 'src/infra/mail/templates/user/delete-account-self-confirmation.template';
 
 @Injectable()
 export class UserService {
@@ -119,5 +120,17 @@ export class UserService {
     await this.prisma.user.delete({
       where: { id: id },
     });
+
+    await this.email.sendEmail({
+      to: user.email as string,
+      subject: `Self account delete confirmation - ${process.env.MAIL_FROM_NAME as string}`,
+      html: deleteAccountConfirmationTemplate({
+        name: user.name as string,
+      }),
+    });
+
+    return {
+      message: 'Account deleted successfully',
+    };
   }
 }
