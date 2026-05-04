@@ -28,6 +28,8 @@ import { changePasswordConfirmationTemplate } from 'src/infra/mail/templates/aut
 import crypto from 'crypto';
 import { GoogleUserInfo } from '../types/google-paylod';
 import axios from 'axios';
+import appleSignin from 'apple-signin-auth';
+import { AppleUserInfo } from '../types/apple-user-info';
 @Injectable()
 export class AuthService {
   constructor(
@@ -210,6 +212,31 @@ export class AuthService {
       );
     }
   }
+
+  // verify apple session
+  private async verifyAppleToken(
+    identityToken: string,
+  ): Promise<AppleUserInfo> {
+    try {
+      const res = await appleSignin.verifyIdToken(identityToken, {
+        audience: [process.env.APPLE_BUNDLE_ID!, process.env.APPLE_SERVICE_ID!],
+        ignoreExpiration: false,
+      });
+
+      return {
+        sub: res.sub,
+        email: res.email ?? '',
+        email_verified: res.email_verified === 'true',
+      };
+    } catch (error) {
+      console.log(error);
+      throw new InternalServerErrorException(
+        ` Something went wrong, can't login at the moment `,
+      );
+    }
+  }
+
+  // services
 
   // register account service
   async register(dto: RegisterDto) {
@@ -774,6 +801,77 @@ export class AuthService {
           profilePicturePublicId: null,
           isOtpVerified: true,
           authProvider: 'google',
+          termsAndConditions: true,
+          role: 'user',
+          otpAttempts: 0,
+          password: crypto.randomBytes(32).toString('hex'),
+        },
+      });
+    }
+
+    const payload = {
+      name: user.name as string,
+      email: user.email as string,
+      id: user.id,
+      isGuest: user.isGuest as boolean,
+      isPaid: user.isPaid as boolean,
+      role: user.role,
+    };
+
+    const accessToken = this.generateToken(payload, 'user', 'access');
+    const refreshToken = this.generateToken(payload, 'user', 'refresh');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: refreshToken,
+      },
+    });
+
+    const data = {
+      name: user.name,
+      email: user.email,
+      profilePictureURL: user.profilePictureURL,
+    };
+
+    await this.email.sendEmail({
+      to: user.email as string,
+      subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
+      html: accountVerificationConfirmationTemplate({
+        name: user.name as string,
+      }),
+    });
+
+    return {
+      message: 'Google log in successfull',
+      data: {
+        token: {
+          accessToken,
+          refreshToken,
+        },
+        user: data,
+      },
+    };
+  }
+
+  // apple login service
+  async appleLogin(token: string) {
+    const res = await this.verifyAppleToken(token);
+    const { email } = res;
+
+    let user = await this.prisma.user.findUnique({
+      where: { email: email },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: email,
+          name: 'apple user',
+          profilePictureURL: null,
+          profilePicturePublicId: null,
+          isOtpVerified: true,
+          authProvider: 'apple',
           termsAndConditions: true,
           role: 'user',
           otpAttempts: 0,

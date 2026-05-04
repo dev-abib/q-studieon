@@ -108,4 +108,11 @@ export class AuthController {
   googleLogin(@Body('token') token: string) {
     return this.authService.googleLogin(token);
   }
+
+  @Post('google-login')
+  @HttpCode(200)
+  @Public()
+  appleLogin(@Body('token') token: string) {
+    return this.authService.appleLogin(token);
+  }
 }
