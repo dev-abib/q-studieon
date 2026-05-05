@@ -41,6 +41,14 @@ export class UserController {
   }
 
   // Forgot password controller
+  @Post('resend-otp')
+  @HttpCode(200)
+  @Public()
+  resendOtp(@Body() dto: ResendOtpDto) {
+    return this.authService.resendOtp(dto);
+  }
+
+  // Forgot password controller
   @Post('forgot-password')
   @HttpCode(200)
   @Public()
