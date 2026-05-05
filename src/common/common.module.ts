@@ -1,7 +1,7 @@
 // src/common/common.module.ts
 import { Module, Global } from '@nestjs/common';
 import { UserRepository } from './repositories/user.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Global()
 @Module({

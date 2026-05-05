@@ -1,7 +1,7 @@
 // src/common/repositories/user.repository.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import bcrypt from 'bcrypt';
-import { JwtPayload } from 'src/auth/types/jwt.types';
+import { JwtPayload } from '../types/jwt.types';
 import { StringValue } from 'ms';
 import { JwtService } from '@nestjs/jwt';
 import { createHash } from 'crypto';

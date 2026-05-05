@@ -13,15 +13,15 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Auth } from 'src/auth/decorators/auth.decorator';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import type { JwtPayload } from 'src/auth/types/jwt.types';
-import { NoGuest } from 'src/auth/decorators/no-guest.decorator';
-import { createFileUploadInterceptor } from 'src/common/interceptors/file-upload.interceptor';
+import { Auth } from '../auth/decorators/auth.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../auth/types/jwt.types';
+import { NoGuest } from '../auth/decorators/no-guest.decorator';
+import { createFileUploadInterceptor } from '../common/interceptors/file-upload.interceptor';
 import {
   FileValidationPipe,
   type MulterFile,
-} from 'src/common/pipes/file-validation.pipe';
+} from '../common/pipes/file-validation.pipe';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 
 @Controller('user')

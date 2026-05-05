@@ -4,13 +4,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { EmailService } from 'src/infra/mail/mail.service';
-import { UserRepository } from 'src/common/repositories/user.repository';
-import { CloudinaryService } from 'src/common/services/cloudinary.service';
-import { MulterFile } from 'src/common/pipes/file-validation.pipe';
+import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../infra/mail/mail.service';
+import { UserRepository } from '../common/repositories/user.repository';
+import { CloudinaryService } from '../common/services/cloudinary.service';
+import { MulterFile } from '../common/pipes/file-validation.pipe';
 import { DeleteAccountDto } from './dto/delete-account.dto';
-import { deleteAccountConfirmationTemplate } from 'src/infra/mail/templates/user/delete-account-self-confirmation.template';
+import { deleteAccountConfirmationTemplate } from '../infra/mail/templates/user/delete-account-self-confirmation.template';
 
 @Injectable()
 export class UserService {

@@ -5,30 +5,30 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { User } from '@prisma/client';
-import { EmailService } from 'src/infra/mail/mail.service';
-import { accountVerificationTemplate } from 'src/infra/mail/templates/auth/account-verification.template';
+import { EmailService } from '../../infra/mail/mail.service';
+import { accountVerificationTemplate } from '../../infra/mail/templates/auth/account-verification.template';
 import { randomBytes, createHash } from 'crypto';
 import { LoginDto } from '../dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from '../types/jwt.types';
 import { VerifyAccountDto } from '../dto/verify-account.dto';
 import { ResendOtpDto } from '../dto/resend-otp';
-import { accountVerificationConfirmationTemplate } from 'src/infra/mail/templates/system/account-verification-confirmation.template';
-import { resetPasswordTemplate } from 'src/infra/mail/templates/auth/reset-password.template';
+import { accountVerificationConfirmationTemplate } from '../../infra/mail/templates/system/account-verification-confirmation.template';
+import { resetPasswordTemplate } from '../../infra/mail/templates/auth/reset-password.template';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
-import { resetPasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/reset-password-confirmation.template';
+import { resetPasswordConfirmationTemplate } from '../../infra/mail/templates/auth/reset-password-confirmation.template';
 import { ChangePasswordDto } from '../dto/change-password.dto';
-import { changePasswordConfirmationTemplate } from 'src/infra/mail/templates/auth/change-password-confirmation.template';
+import { changePasswordConfirmationTemplate } from '../../infra/mail/templates/auth/change-password-confirmation.template';
 import crypto from 'crypto';
 import { GoogleUserInfo } from '../types/google-paylod';
 import axios from 'axios';
 import appleSignin from 'apple-signin-auth';
 import { AppleUserInfo } from '../types/apple-user-info';
-import { UserRepository } from 'src/common/repositories/user.repository';
-import { AuthHelper } from 'src/auth/helpers/auth.helper';
+import { UserRepository } from '../../common/repositories/user.repository';
+import { AuthHelper } from '../helpers/auth.helper';
 
 @Injectable()
 export class UserService {

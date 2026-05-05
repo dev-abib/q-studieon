@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { EmailService } from 'src/infra/mail/mail.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../infra/mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
-import { UserRepository } from 'src/common/repositories/user.repository';
+import { UserRepository } from '../../common/repositories/user.repository';
 import { AuthHelper } from '../helpers/auth.helper';
 
 describe('UserService', () => {
