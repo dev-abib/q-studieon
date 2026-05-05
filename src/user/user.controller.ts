@@ -71,6 +71,7 @@ export class UserController {
 
   // delete user controller
   @Delete('delete-account')
+  @HttpCode(204)
   @Auth('user')
   @NoGuest()
   deleteUser(@Body() dto: DeleteAccountDto, @CurrentUser() user: JwtPayload) {

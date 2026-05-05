@@ -1,20 +1,20 @@
-import { Body, Controller, HttpCode, Ip, Post, Headers } from '@nestjs/common';
-import { AuthService } from './services/auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { VerifyAccountDto } from './dto/verify-account.dto';
-import { ResendOtpDto } from './dto/resend-otp';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { Auth } from './decorators/auth.decorator';
-import { CurrentUser } from './decorators/current-user.decorator';
-import type { JwtPayload } from './types/jwt.types';
-import { Public } from './decorators/public.decorator';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { Body, Controller, Headers, HttpCode, Ip, Post } from '@nestjs/common';
+import { Public } from '../decorators/public.decorator';
+import { RegisterDto } from '../dto/register.dto';
+import { LoginDto } from '../dto/login.dto';
+import { VerifyAccountDto } from '../dto/verify-account.dto';
+import { ResendOtpDto } from '../dto/resend-otp';
+import { Auth } from '../decorators/auth.decorator';
+import { CurrentUser } from '../decorators/current-user.decorator';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
+import type { JwtPayload } from '../types/jwt.types';
+import { ChangePasswordDto } from '../dto/change-password.dto';
+import { RefreshTokenDto } from '../dto/refresh-token.dto';
+import { UserService } from './user.service';
 
-@Controller('auth')
-export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+@Controller('auth/user')
+export class UserController {
+  constructor(private readonly authService: UserService) {}
 
   // Register controller
   @Post('register')
@@ -113,7 +113,7 @@ export class AuthController {
   // refresh token controller
   @Post('refresh-token')
   @Public()
-  async refresh(@Body() dto: RefreshTokenDto) {
+  refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refreshToken);
   }
 }

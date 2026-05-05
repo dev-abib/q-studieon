@@ -1,16 +1,15 @@
+// src/auth/auth.module.ts
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
-import { AuthController } from './auth.controller';
-import { AuthService } from './services/auth.service';
-import { RolesGuard } from './guards/roles.guard';
+import { JwtModule } from '@nestjs/jwt'; // ✅
 import { AuthGuard } from './guards/auth-guard';
+import { RolesGuard } from './guards/roles.guard';
+import { UserModule } from './user/user.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [JwtModule.register({})],
-  controllers: [AuthController],
+  imports: [JwtModule.register({}), UserModule, AdminModule],
   providers: [
-    AuthService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard,
@@ -20,6 +19,5 @@ import { AuthGuard } from './guards/auth-guard';
       useClass: RolesGuard,
     },
   ],
-  exports: [AuthService],
 })
 export class AuthModule {}
