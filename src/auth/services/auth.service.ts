@@ -156,7 +156,7 @@ export class AuthService {
     token: string,
     type: 'user' | 'admin' | 'reset',
     tokenType: 'access' | 'refresh',
-  ): any {
+  ): JwtPayload {
     const config = this.getJwtConfig(type, tokenType);
 
     try {
@@ -211,6 +211,11 @@ export class AuthService {
         ` Something went wrong, can't login at the moment `,
       );
     }
+  }
+
+  // hash refresh token
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   // services
@@ -281,7 +286,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        refreshToken: refreshToken,
+        refreshToken: this.hashToken(refreshToken),
       },
     });
 
@@ -391,7 +396,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        refreshToken: refreshToken,
+        refreshToken: this.hashToken(refreshToken),
       },
     });
 
@@ -681,7 +686,7 @@ export class AuthService {
 
       await this.prisma.user.update({
         where: { id: existingGuest.id },
-        data: { refreshToken },
+        data: { refreshToken: this.hashToken(refreshToken) },
       });
 
       return {
@@ -725,7 +730,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken },
+      data: { refreshToken: this.hashToken(refreshToken) },
     });
 
     return {
@@ -780,7 +785,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        refreshToken: refreshToken,
+        refreshToken: this.hashToken(refreshToken),
       },
     });
 
@@ -851,7 +856,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        refreshToken: refreshToken,
+        refreshToken: this.hashToken(refreshToken),
       },
     });
 
@@ -898,6 +903,49 @@ export class AuthService {
         token: {
           accessToken: null,
           refreshToken: null,
+        },
+      },
+    };
+  }
+
+  async refreshToken(refreshToken: string) {
+    let payload: JwtPayload;
+    try {
+      payload = this.verifyToken(refreshToken, 'user', 'refresh');
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const user = await this.userRepo.findUser('id', payload.id);
+
+    const hashedIncoming = this.hashToken(refreshToken);
+    if (!user.refreshToken || user.refreshToken !== hashedIncoming) {
+      throw new UnauthorizedException('Refresh token revoked or mismatched');
+    }
+
+    const newPayload: JwtPayload = {
+      id: user.id,
+      email: user.email as string,
+      name: user.name as string,
+      role: user.role,
+      isGuest: user.isGuest as boolean,
+      isPaid: user.isPaid as boolean,
+    };
+
+    const newAccessToken = this.generateToken(newPayload, 'user', 'access');
+    const newRefreshToken = this.generateToken(newPayload, 'user', 'refresh');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: this.hashToken(newRefreshToken) },
+    });
+
+    return {
+      message: 'Token refreshed successfully',
+      data: {
+        token: {
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
         },
       },
     };

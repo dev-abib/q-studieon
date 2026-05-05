@@ -10,6 +10,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import type { JwtPayload } from './types/jwt.types';
 import { Public } from './decorators/public.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -107,5 +108,12 @@ export class AuthController {
   @Auth('user')
   logOut(@CurrentUser() user: JwtPayload) {
     return this.authService.logOut(user.id);
+  }
+
+  // refresh token controller
+  @Post('refresh-token')
+  @Public()
+  async refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshToken(dto.refreshToken);
   }
 }
