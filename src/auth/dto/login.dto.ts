@@ -1,7 +1,6 @@
 import {
   IsEmail,
   IsString,
-  IsStrongPassword,
   Matches,
   MaxLength,
   MinLength,

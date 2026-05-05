@@ -33,12 +33,12 @@ export class UserService {
       );
 
     const {
-      password,
-      otp,
-      otpAttempts,
-      otpExpires,
-      refreshToken,
-      resetToken,
+      password: _password,
+      otp: _otp,
+      otpAttempts: _otpAttempts,
+      otpExpires: _otpExpires,
+      refreshToken: _refreshToken,
+      resetToken: _resetToken,
       ...safeUser
     } = user;
 
@@ -82,13 +82,13 @@ export class UserService {
     });
 
     const {
-      password,
-      otp,
-      otpAttempts,
-      otpExpires,
-      refreshToken,
-      resetToken,
-      profilePicturePublicId,
+      password: _password,
+      otp: _otp,
+      otpAttempts: _otpAttempts,
+      otpExpires: _otpExpires,
+      refreshToken: _refreshToken,
+      resetToken: _resetToken,
+      profilePicturePublicId: _profilePicturePublicId,
       ...safeUser
     } = updated;
 

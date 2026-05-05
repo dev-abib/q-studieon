@@ -67,7 +67,7 @@ export class AuthGuard implements CanActivate {
 
     try {
       decoded = this.jwt.verify(token, { secret });
-    } catch (err: unknown) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
 

@@ -642,7 +642,7 @@ export class UserService {
   //  google login service
   async googleLogin(token: string) {
     const res = await this.verifyGoogleAccessToken(token);
-    const { name, email, email_verified, picture } = res;
+    const { name, email, picture } = res;
 
     let user = await this.prisma.user.findUnique({
       where: { email: email },
