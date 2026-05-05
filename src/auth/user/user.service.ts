@@ -313,14 +313,13 @@ export class UserService {
     };
   }
 
-  // resend otp service
   async resendOtp(dto: ResendOtpDto) {
     const user = await this.userRepo.findUser('email', dto.email);
     const otp = this.generateOtp(4);
     const hashOtp = this.hashOtp(otp);
     const otpExpiry = this.getOtpExpiry();
 
-    if (user.isOtpVerified)
+    if (user.isOtpVerified && !user.isResetRequest)
       throw new BadRequestException('Account already verified');
 
     if (!user.isOtpVerified && (user.otpAttempts ?? 0) === 3) {
@@ -341,12 +340,18 @@ export class UserService {
 
     const isMailSent = await this.email.sendEmail({
       to: user.email as string,
-      subject: `Account verification otp  ${process.env.MAIL_FROM_NAME as string}`,
-      html: accountVerificationTemplate({
-        name: user.name as string,
-        email: user.email as string,
-        otp: otp,
-      }),
+      subject: `OTP ${process.env.MAIL_FROM_NAME as string}`,
+      html: user.isResetRequest
+        ? resetPasswordTemplate({
+            name: user.name as string,
+            email: user.email as string,
+            otp,
+          })
+        : accountVerificationTemplate({
+            name: user.name as string,
+            email: user.email as string,
+            otp,
+          }),
     });
 
     if (!isMailSent) {
@@ -365,13 +370,18 @@ export class UserService {
   async forgotPassword(dto: ResendOtpDto) {
     const user = await this.userRepo.findUser('email', dto.email);
 
-    const otp = this.generateOtp(4);
-    const hashOtp = this.hashOtp(otp);
-    const otpExpiry = this.getOtpExpiry();
+    if (user.blockedUntil && user.blockedUntil > new Date()) {
+      const minutesLeft = Math.ceil(
+        (user.blockedUntil.getTime() - Date.now()) / 60000,
+      );
+      throw new BadRequestException(
+        `Account is blocked. Try again in ${minutesLeft} minutes.`,
+      );
+    }
 
     if (!user.isOtpVerified) {
       throw new UnauthorizedException(
-        'To reset your password , you must have to verify you account at first',
+        'To reset your password, you must verify your account first',
       );
     }
 
@@ -391,6 +401,10 @@ export class UserService {
       );
     }
 
+    const otp = this.generateOtp(4);
+    const hashOtp = this.hashOtp(otp);
+    const otpExpiry = this.getOtpExpiry();
+
     await this.prisma.user.update({
       where: { email: dto.email },
       data: {
@@ -398,22 +412,23 @@ export class UserService {
         otpAttempts: { increment: 1 },
         otpExpires: otpExpiry,
         blockedUntil: null,
+        isResetRequest: true,
       },
     });
 
     const isMailSent = await this.email.sendEmail({
       to: user.email as string,
-      subject: `Forgot password otp  ${process.env.MAIL_FROM_NAME as string}`,
+      subject: `Forgot password otp ${process.env.MAIL_FROM_NAME as string}`,
       html: resetPasswordTemplate({
         name: user.name as string,
         email: user.email as string,
-        otp: otp,
+        otp,
       }),
     });
 
     if (!isMailSent) {
       throw new InternalServerErrorException(
-        "Something went wrong, can't sent otp at the moment",
+        "Something went wrong, can't send otp at the moment",
       );
     }
 
@@ -481,6 +496,9 @@ export class UserService {
       where: { id: user.id },
       data: {
         password: hashedPassword,
+        isResetRequest: false,
+        resetToken: null,
+        otpAttempts: 0,
       },
     });
 

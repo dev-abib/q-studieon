@@ -64,6 +64,7 @@ model User {
   blockedUntil DateTime?
   guestIp      String?
   guestDeviceId  String? 
+  isResetRequest Boolean? @default(false)
 
   @@map("users")
 }
