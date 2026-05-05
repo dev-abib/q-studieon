@@ -22,7 +22,10 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "types": ["node", "jest", "express"],
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "paths": {
+      "src/*": ["./src/*"] 
+    }
   },
   "include": ["src/**/*", "src/types/express.d.ts", "test/**/*"]
 }
