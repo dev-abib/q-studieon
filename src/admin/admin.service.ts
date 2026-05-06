@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -8,9 +7,12 @@ import { JwtPayload } from 'src/auth/types/jwt.types';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { UserRepository } from 'src/common/repositories/user.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { AuthHelper } from 'src/auth/helpers/auth.helper';
+import { UpdateAdminDto } from './dto/update-admin.dto';
+import { MulterFile } from 'src/common/pipes/file-validation.pipe';
+import { CloudinaryService } from 'src/common/services/cloudinary.service';
 
 @Injectable()
 export class AdminService {
@@ -18,6 +20,7 @@ export class AdminService {
     private readonly userRepo: UserRepository,
     private readonly prisma: PrismaService,
     private readonly auth: AuthHelper,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   // get me admin service
@@ -141,6 +144,47 @@ export class AdminService {
         role: admin.role,
         picture: admin.profilePictureURL,
       },
+    };
+  }
+
+  // update admin
+  async updateAdmin(
+    dto: UpdateAdminDto,
+    profilePicture: MulterFile,
+    user: JwtPayload,
+  ) {
+    const admin = await this.userRepo.findUser('id', user.id);
+    let newProfilePictureURL: string | undefined;
+    let newProfilePicturePublicId: string | undefined;
+
+    if (profilePicture) {
+      if (admin.profilePicturePublicId) {
+        await this.cloudinary.deleteFile(admin.profilePicturePublicId);
+      }
+
+      const uploaded = await this.cloudinary.uploadFile(
+        profilePicture,
+        'profile-pictures',
+      );
+      newProfilePictureURL = uploaded.url;
+      newProfilePicturePublicId = uploaded.publicId;
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        ...dto,
+        ...(newProfilePictureURL && {
+          profilePictureURL: newProfilePictureURL,
+        }),
+        ...(newProfilePicturePublicId && {
+          profilePicturePublicId: newProfilePicturePublicId,
+        }),
+      },
+    });
+
+    return {
+      message: `Admin data updated successfully`,
     };
   }
 }

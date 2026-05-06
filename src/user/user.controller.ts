@@ -52,7 +52,7 @@ export class UserController {
   @NoGuest()
   @UseInterceptors(createFileUploadInterceptor({ fieldName: 'profilePicture' }))
   updateUser(
-    @Body(new ValidationPipe({ whitelist: true })) dto: UpdateUserDto,
+    @Body() dto: UpdateUserDto,
     @UploadedFile(new FileValidationPipe({ required: false, maxSizeMB: 5 }))
     profilePicture: MulterFile,
     @CurrentUser() user: JwtPayload,
