@@ -11,12 +11,14 @@ import type { JwtPayload } from '../types/jwt.types';
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
+  // login admin controller
   @Post('login')
   @Public()
   loginAdmin(@Body() dto: AdminLoginDto) {
     return this.adminService.loginAdmin(dto);
   }
 
+  //  admin refresh token controller
   @Post('refresh-token')
   @Public()
   refreshToken(@Body() dto: RefreshTokenDto) {
