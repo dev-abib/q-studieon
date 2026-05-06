@@ -103,7 +103,7 @@ export class AuthHelper {
   // verify token helper
   verifyToken(
     token: string,
-    type: 'user' | 'admin' | 'reset',
+    type: 'user' | 'admin' | 'reset' | 'super_admin',
     tokenType: 'access' | 'refresh',
   ): JwtPayload {
     const config = this.getJwtConfig(type, tokenType);

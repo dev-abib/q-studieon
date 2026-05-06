@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { AdminLoginDto } from '../dto/admin-login.dto';
 import { AuthHelper } from '../helpers/auth.helper';
 import { UserRepository } from 'src/common/repositories/user.repository';
+import { JwtPayload } from '../types/jwt.types';
 
 @Injectable()
 export class AdminService {
@@ -12,10 +13,9 @@ export class AdminService {
     private readonly userRepo: UserRepository,
   ) {}
 
+  // login service
   async loginAdmin(dto: AdminLoginDto) {
     const admin = await this.userRepo.findUser('email', dto.email);
-
-    console.log(admin);
 
     if (admin?.role !== 'admin' && admin?.role !== 'super_admin') {
       throw new UnauthorizedException(
@@ -54,6 +54,10 @@ export class AdminService {
       refreshToken = this.auth.generateToken(payload, 'admin', 'refresh');
     }
 
+    await this.prisma.user.update({
+      where: { id: admin.id },
+      data: { refreshToken: this.auth.hashToken(refreshToken) },
+    });
     return {
       message: `${admin.role} logged in successfully`,
       data: {
@@ -66,6 +70,58 @@ export class AdminService {
           email: admin.email,
           picture: admin.profilePictureURL,
           role: admin.role,
+        },
+      },
+    };
+  }
+
+  //  refresh token service
+  async refreshToken(refreshToken: string) {
+    let payload: JwtPayload;
+    try {
+      payload = this.auth.verifyToken(refreshToken, 'admin', 'refresh');
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const admin = await this.userRepo.findUser('id', payload.id);
+
+    const hashedIncoming = this.auth.hashToken(refreshToken);
+    if (!admin.refreshToken || admin.refreshToken !== hashedIncoming) {
+      throw new UnauthorizedException('Refresh token revoked or mismatched');
+    }
+
+    const newPayload: JwtPayload = {
+      id: admin.id,
+      email: admin.email as string,
+      name: admin.name as string,
+      role: admin.role,
+      isGuest: admin.isGuest as boolean,
+      isPaid: admin.isPaid as boolean,
+    };
+
+    const newAccessToken = this.auth.generateToken(
+      newPayload,
+      'admin',
+      'access',
+    );
+    const newRefreshToken = this.auth.generateToken(
+      newPayload,
+      'admin',
+      'refresh',
+    );
+
+    await this.prisma.user.update({
+      where: { id: admin.id },
+      data: { refreshToken: this.auth.hashToken(newRefreshToken) },
+    });
+
+    return {
+      message: 'Token refreshed successfully',
+      data: {
+        token: {
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
         },
       },
     };
