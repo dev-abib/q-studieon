@@ -31,7 +31,7 @@ export class AuthHelper {
   }
 
   getJwtConfig(
-    type: 'user' | 'admin' | 'reset',
+    type: 'user' | 'admin' | 'reset' | 'super_admin',
     token: 'access' | 'refresh',
   ): { secret: string; expiresIn: StringValue } {
     if (type === 'user') {
@@ -54,7 +54,7 @@ export class AuthHelper {
       };
     }
 
-    if (type === 'admin') {
+    if (type === 'admin' || type === 'super_admin') {
       return {
         secret:
           token === 'access'
@@ -89,7 +89,7 @@ export class AuthHelper {
   // token generate helper
   generateToken(
     payload: JwtPayload,
-    userType: 'user' | 'admin' | 'reset',
+    userType: 'user' | 'admin' | 'reset' | 'super_admin',
     tokenType: 'access' | 'refresh',
   ): string {
     const config = this.getJwtConfig(userType, tokenType);

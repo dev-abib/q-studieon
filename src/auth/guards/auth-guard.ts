@@ -12,7 +12,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { NO_GUEST_KEY } from '../decorators/no-guest.decorator';
 import { JwtPayload } from './../types/jwt.types';
 
-type AuthType = 'user' | 'admin' | 'reset';
+type AuthType = 'user' | 'admin' | 'super_admin' | 'reset'; // ✅ added super_admin
 
 function isJwtPayload(value: unknown): value is JwtPayload {
   return (
@@ -26,7 +26,12 @@ function isJwtPayload(value: unknown): value is JwtPayload {
 }
 
 function isAuthType(value: unknown): value is AuthType {
-  return value === 'user' || value === 'admin' || value === 'reset';
+  return (
+    value === 'user' ||
+    value === 'admin' ||
+    value === 'super_admin' ||
+    value === 'reset'
+  );
 }
 
 function getEnv(key: string): string {
@@ -92,6 +97,10 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Admin access required');
     }
 
+    if (authType === 'super_admin' && decoded.role !== 'super_admin') {
+      throw new UnauthorizedException('Super admin access required');
+    }
+
     if (authType === 'user' && decoded.role !== 'user') {
       throw new UnauthorizedException('User access required');
     }
@@ -108,6 +117,7 @@ export class AuthGuard implements CanActivate {
   private getSecret(type: AuthType): string {
     if (type === 'user') return getEnv('JWT_ACCESS_SECRET');
     if (type === 'admin') return getEnv('JWT_ADMIN_SECRET');
+    if (type === 'super_admin') return getEnv('JWT_ADMIN_SECRET');
     if (type === 'reset') return getEnv('JWT_RESET_SECRET');
     throw new UnauthorizedException('Unknown auth type');
   }
