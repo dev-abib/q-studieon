@@ -35,13 +35,15 @@ export class AdminController {
     return this.adminService.getMeAdmin(user);
   }
 
-  @Get('get-all-admin')
+  // get all admin controller
+  @Get('get-all-admins')
   @Auth('super_admin')
   @HttpCode(200)
   getAllAdmin(@Query() query: PaginationDto) {
-    return this.adminService.getAllAdmins(query);
+    return this.adminService.getAllAdminsUsers(query);
   }
 
+  //  create admin controller
   @Post('create-admin')
   @Auth('super_admin')
   @HttpCode(201)
@@ -49,6 +51,7 @@ export class AdminController {
     return this.adminService.createAdmin(dto);
   }
 
+  // update admin controller
   @Put('update-admin')
   @Auth('admin')
   @HttpCode(200)
@@ -67,5 +70,13 @@ export class AdminController {
       throw new BadRequestException('At least one field must be provided');
     }
     return this.adminService.updateAdmin(dto, profilePicture, user);
+  }
+
+  // get all admin controller
+  @Get('get-all-users')
+  @Auth('admin')
+  @HttpCode(200)
+  getAllUsers(@Query() query: PaginationDto) {
+    return this.adminService.getAllAdminsUsers(query, false);
   }
 }

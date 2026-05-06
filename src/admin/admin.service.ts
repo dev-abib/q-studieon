@@ -54,7 +54,7 @@ export class AdminService {
   }
 
   //  get all admin service
-  async getAllAdmins(query: PaginationDto) {
+  async getAllAdminsUsers(query: PaginationDto, isAdmin: boolean = true) {
     const { page, limit, skip, sortBy, sortOrder, search } = query;
 
     const allowedSortFields = ['name', 'email', 'createdAt', 'updatedAt'];
@@ -63,7 +63,7 @@ export class AdminService {
       : 'createdAt';
 
     const where: Prisma.UserWhereInput = {
-      role: 'admin',
+      role: isAdmin ? 'admin' : 'user',
       ...(search && {
         OR: [
           { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
@@ -72,7 +72,7 @@ export class AdminService {
       }),
     };
 
-    const [admins, total] = await Promise.all([
+    const [directory, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
         orderBy: { [safeSortBy]: sortOrder },
@@ -93,9 +93,9 @@ export class AdminService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      message: 'Admin list fetched successfully',
+      message: ` ${isAdmin ? 'Admins ' : 'users'} list fetched successfully`,
       data: {
-        admins,
+        directory,
         meta: {
           total,
           page,
