@@ -65,7 +65,7 @@ export class AdminService {
           accessToken,
           refreshToken,
         },
-        user: {
+        admin: {
           name: admin.name,
           email: admin.email,
           picture: admin.profilePictureURL,

@@ -187,4 +187,25 @@ export class AdminService {
       message: `Admin data updated successfully`,
     };
   }
+
+  // delete admin
+  async deleteAdmin(id: string) {
+    const admin = await this.userRepo.findUser('id', id);
+
+    if (admin.profilePicturePublicId) {
+      await this.cloudinary.deleteFile(admin.profilePicturePublicId);
+    }
+
+    await this.prisma.user.delete({
+      where: { id: id },
+    });
+
+    return {
+      message: `Admin deleted successfully`,
+      data: {
+        name: admin.name,
+        email: admin.email,
+      },
+    };
+  }
 }

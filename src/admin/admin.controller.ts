@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
+  Param,
   Post,
   Put,
   Query,
@@ -72,11 +74,18 @@ export class AdminController {
     return this.adminService.updateAdmin(dto, profilePicture, user);
   }
 
-  // get all admin controller
+  // get all users controller
   @Get('get-all-users')
   @Auth('admin')
   @HttpCode(200)
   getAllUsers(@Query() query: PaginationDto) {
     return this.adminService.getAllAdminsUsers(query, false);
+  }
+
+  @Delete('delete-admin/:id')
+  @Auth('super_admin')
+  @HttpCode(200)
+  deleteAdmin(@Param('id') id: string) {
+    return this.adminService.deleteAdmin(id);
   }
 }
