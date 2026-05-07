@@ -13,6 +13,8 @@ import { AuthHelper } from 'src/auth/helpers/auth.helper';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { MulterFile } from 'src/common/pipes/file-validation.pipe';
 import { CloudinaryService } from 'src/common/services/cloudinary.service';
+import { EmailService } from 'src/infra/mail/mail.service';
+import { systemDeleteAccountTemplate } from 'src/infra/mail/templates/system/delete-account-syestem-confirmation.template';
 
 @Injectable()
 export class AdminService {
@@ -21,6 +23,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly auth: AuthHelper,
     private readonly cloudinary: CloudinaryService,
+    private readonly email: EmailService,
   ) {}
 
   // get me admin service
@@ -189,8 +192,18 @@ export class AdminService {
   }
 
   // delete admin
-  async deleteAdmin(id: string) {
+  async deleteAdminOrUser(
+    id: string,
+    isAdminDelete: boolean = true,
+    session: JwtPayload,
+  ) {
     const admin = await this.userRepo.findUser('id', id);
+
+    if (isAdminDelete && session.role !== 'super_admin') {
+      throw new UnauthorizedException(
+        `You don't have sufficient access to remove a admin`,
+      );
+    }
 
     if (admin.profilePicturePublicId) {
       await this.cloudinary.deleteFile(admin.profilePicturePublicId);
@@ -200,8 +213,22 @@ export class AdminService {
       where: { id: id },
     });
 
+    if (!isAdminDelete && !admin.isGuest) {
+      await this.email.sendEmail({
+        to: admin.email as string,
+        subject: `Account Suspension Notice — ${process.env.MAIL_FROM_NAME as string}`,
+        html: systemDeleteAccountTemplate({
+          name: admin.name as string,
+          reason:
+            'Repeated violation of our Terms of Service and Community Guidelines.',
+          deletedBy: 'Site Administrator',
+          supportEmail: `${process.env.MAIL_FROM}`,
+        }),
+      });
+    }
+
     return {
-      message: `Admin deleted successfully`,
+      message: ` ${isAdminDelete ? 'Admin' : 'User'} deleted successfully`,
       data: {
         name: admin.name,
         email: admin.email,

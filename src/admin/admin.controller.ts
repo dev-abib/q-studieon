@@ -85,7 +85,14 @@ export class AdminController {
   @Delete('delete-admin/:id')
   @Auth('super_admin')
   @HttpCode(200)
-  deleteAdmin(@Param('id') id: string) {
-    return this.adminService.deleteAdmin(id);
+  deleteAdmin(@Param('id') id: string, @CurrentUser() admin: JwtPayload) {
+    return this.adminService.deleteAdminOrUser(id, true, admin);
+  }
+
+  @Delete('delete-user/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  deleteUser(@Param('id') id: string, @CurrentUser() admin: JwtPayload) {
+    return this.adminService.deleteAdminOrUser(id, false, admin);
   }
 }

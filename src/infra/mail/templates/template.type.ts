@@ -36,10 +36,16 @@ export interface UserMailProps {
   lastName: string;
   subject: string;
   message: string;
-  d;
   sentAt?: Date;
 }
 
 export interface DeleteAccountConfirmationProps {
   name: string;
+}
+
+export interface SystemDeleteAccountProps {
+  name: string;
+  reason?: string;
+  deletedBy?: string;
+  supportEmail: string;
 }
