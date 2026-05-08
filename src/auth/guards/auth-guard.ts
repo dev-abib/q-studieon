@@ -1,3 +1,4 @@
+// src/guards/auth.guard.ts
 import {
   CanActivate,
   ExecutionContext,
@@ -12,33 +13,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { NO_GUEST_KEY } from '../decorators/no-guest.decorator';
 import { JwtPayload } from './../types/jwt.types';
 
-type AuthType = 'user' | 'admin' | 'super_admin' | 'reset'; // ✅ added super_admin
-
-function isJwtPayload(value: unknown): value is JwtPayload {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    'email' in value &&
-    'name' in value &&
-    'role' in value
-  );
-}
-
-function isAuthType(value: unknown): value is AuthType {
-  return (
-    value === 'user' ||
-    value === 'admin' ||
-    value === 'super_admin' ||
-    value === 'reset'
-  );
-}
-
-function getEnv(key: string): string {
-  const value = process.env[key];
-  if (!value) throw new UnauthorizedException(`Missing env variable: ${key}`);
-  return value;
-}
+type AuthType = 'user' | 'admin' | 'super_admin' | 'reset';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -48,7 +23,7 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const isPublic: unknown = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [
+    const isPublic: boolean = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -58,9 +33,11 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    const authType: AuthType = isAuthType(rawType) ? rawType : 'user';
+    const authType: AuthType = this.isAuthType(rawType) ? rawType : 'user';
 
     const request = context.switchToHttp().getRequest<Request>();
+
+    // ←←← UPDATED: Support both Header and Cookie
     const token = this.extractToken(request);
 
     if (!token) {
@@ -76,11 +53,11 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    if (!isJwtPayload(decoded)) {
+    if (!this.isJwtPayload(decoded)) {
       throw new UnauthorizedException('Malformed token payload');
     }
 
-    const noGuest: unknown = this.reflector.getAllAndOverride(NO_GUEST_KEY, [
+    const noGuest: boolean = this.reflector.getAllAndOverride(NO_GUEST_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -89,18 +66,16 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Guests cannot access this route');
     }
 
+    // Role checks
     if (
       authType === 'admin' &&
-      decoded.role !== 'admin' &&
-      decoded.role !== 'super_admin'
+      !['admin', 'super_admin'].includes(decoded.role)
     ) {
       throw new UnauthorizedException('Admin access required');
     }
-
     if (authType === 'super_admin' && decoded.role !== 'super_admin') {
       throw new UnauthorizedException('Super admin access required');
     }
-
     if (authType === 'user' && decoded.role !== 'user') {
       throw new UnauthorizedException('User access required');
     }
@@ -110,15 +85,47 @@ export class AuthGuard implements CanActivate {
   }
 
   private extractToken(request: Request): string | null {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' && token ? token : null;
+    const authHeader = request.headers.authorization;
+    if (authHeader) {
+      const [type, token] = authHeader.split(' ');
+      if (type === 'Bearer' && token) return token;
+    }
+
+    const tokenFromCookie =
+      typeof request.cookies?.accessToken === 'string'
+        ? request.cookies.accessToken
+        : null;
+    if (tokenFromCookie) {
+      return tokenFromCookie;
+    }
+
+    return null;
+  }
+
+  private isJwtPayload(value: unknown): value is JwtPayload {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'id' in value &&
+      'email' in value &&
+      'name' in value &&
+      'role' in value
+    );
+  }
+
+  private isAuthType(value: unknown): value is AuthType {
+    return ['user', 'admin', 'super_admin', 'reset'].includes(value as string);
   }
 
   private getSecret(type: AuthType): string {
-    if (type === 'user') return getEnv('JWT_ACCESS_SECRET');
-    if (type === 'admin') return getEnv('JWT_ADMIN_SECRET');
-    if (type === 'super_admin') return getEnv('JWT_ADMIN_SECRET');
-    if (type === 'reset') return getEnv('JWT_RESET_SECRET');
-    throw new UnauthorizedException('Unknown auth type');
+    const secret =
+      type === 'user'
+        ? process.env.JWT_ACCESS_SECRET
+        : process.env.JWT_ADMIN_SECRET;
+
+    if (!secret) {
+      throw new UnauthorizedException(`Missing JWT secret for ${type}`);
+    }
+    return secret;
   }
 }
