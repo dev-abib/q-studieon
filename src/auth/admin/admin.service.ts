@@ -119,7 +119,7 @@ export class AdminService {
     return {
       message: 'Token refreshed successfully',
       data: {
-        token: {
+        tokens: {
           accessToken: newAccessToken,
           refreshToken: newRefreshToken,
         },

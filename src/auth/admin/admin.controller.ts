@@ -1,11 +1,16 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { Public } from '../decorators/public.decorator';
 import { AdminLoginDto } from '../dto/admin-login.dto';
-import { Auth } from '../decorators/auth.decorator';
-import { RefreshTokenDto } from '../dto/refresh-token.dto';
-import { CurrentUser } from '../decorators/current-user.decorator';
-import type { JwtPayload } from '../types/jwt.types';
+import { CookieHelper } from 'src/common/helpers/cookie.helper';
+import type { Request, Response } from 'express';
 
 @Controller('auth/admin')
 export class AdminController {
@@ -14,14 +19,48 @@ export class AdminController {
   // login admin controller
   @Post('login')
   @Public()
-  loginAdmin(@Body() dto: AdminLoginDto) {
-    return this.adminService.loginAdmin(dto);
+  async loginAdmin(
+    @Body() dto: AdminLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.adminService.loginAdmin(dto);
+
+    CookieHelper.setAdminAuthCookies(
+      res,
+      result.data.tokens.accessToken,
+      result.data.tokens.refreshToken,
+    );
+
+    return {
+      message: result.message,
+      data: result.data.admin,
+    };
   }
 
   //  admin refresh token controller
   @Post('refresh-token')
   @Public()
-  refreshToken(@Body() dto: RefreshTokenDto) {
-    return this.adminService.refreshToken(dto.refreshToken);
+  async refreshToken(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = req.cookies?.refreshToken as string;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    const result = await this.adminService.refreshToken(refreshToken);
+
+    CookieHelper.setAdminAuthCookies(
+      res,
+      result.data.tokens.accessToken,
+      result.data.tokens.refreshToken,
+    );
+
+    return {
+      message: result.message,
+      data: null,
+    };
   }
 }
