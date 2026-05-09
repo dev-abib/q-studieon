@@ -799,26 +799,8 @@ export class UserService {
     };
   }
 
-  // log out service
   async logOut(id: string) {
-    const user = await this.userRepo.findUser('id', id);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        refreshToken: null,
-      },
-    });
-
-    return {
-      message: 'Log out successfully',
-      data: {
-        token: {
-          accessToken: null,
-          refreshToken: null,
-        },
-      },
-    };
+    await this.userRepo.logOut(id);
   }
 
   async refreshToken(refreshToken: string) {

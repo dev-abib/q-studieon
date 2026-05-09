@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  HttpCode,
   Post,
   Req,
   Res,
@@ -11,6 +12,9 @@ import { Public } from '../decorators/public.decorator';
 import { AdminLoginDto } from '../dto/admin-login.dto';
 import { CookieHelper } from 'src/common/helpers/cookie.helper';
 import type { Request, Response } from 'express';
+import { Auth } from '../decorators/auth.decorator';
+import { CurrentUser } from '../decorators/current-user.decorator';
+import type { JwtPayload } from '../types/jwt.types';
 
 @Controller('auth/admin')
 export class AdminController {
@@ -62,5 +66,20 @@ export class AdminController {
       message: result.message,
       data: null,
     };
+  }
+
+  // log out controller
+  @Post('log-out')
+  @HttpCode(200)
+  @Auth('admin')
+  async logOut(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.adminService.logOut(user.id);
+
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
   }
 }

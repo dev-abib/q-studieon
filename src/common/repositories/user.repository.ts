@@ -28,4 +28,20 @@ export class UserRepository {
   ): Promise<boolean> {
     return await bcrypt.compare(password, hashPassword);
   }
+
+  // log out service
+  async logOut(id: string) {
+    const user = await this.findUser('id', id);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: null,
+      },
+    });
+
+    return {
+      message: 'Log out successfully',
+    };
+  }
 }

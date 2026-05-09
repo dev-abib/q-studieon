@@ -126,4 +126,8 @@ export class AdminService {
       },
     };
   }
+
+  async logOut(id: string) {
+    await this.userRepo.logOut(id);
+  }
 }
