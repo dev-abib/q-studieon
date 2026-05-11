@@ -75,7 +75,7 @@ export class AdminService {
       }),
     };
 
-    const [directory, total] = await Promise.all([
+    const [directory, total, otpVerifiedCount, guestCount] = await Promise.all([
       this.prisma.user.findMany({
         where,
         orderBy: { [safeSortBy]: sortOrder },
@@ -91,6 +91,8 @@ export class AdminService {
         },
       }),
       this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: { ...where, isOtpVerified: true } }),
+      this.prisma.user.count({ where: { ...where, isGuest: true } }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -101,6 +103,8 @@ export class AdminService {
         directory,
         meta: {
           total,
+          otpVerifiedCount,
+          guestCount,
           page,
           limit,
           totalPages,
