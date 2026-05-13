@@ -3,6 +3,7 @@ import {
   Controller,
   HttpCode,
   Post,
+  Put,
   Req,
   Res,
   UnauthorizedException,
@@ -15,6 +16,7 @@ import type { Request, Response } from 'express';
 import { Auth } from '../decorators/auth.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import type { JwtPayload } from '../types/jwt.types';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 
 @Controller('auth/admin')
 export class AdminController {
@@ -81,5 +83,22 @@ export class AdminController {
 
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
+  }
+
+  // change password controller
+  @Put('change-password')
+  @HttpCode(200)
+  @Auth('admin')
+  async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: JwtPayload,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.adminService.changePassword(dto, user.id);
+
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    return { message: 'Password changed successfully' };
   }
 }

@@ -1,9 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AdminLoginDto } from '../dto/admin-login.dto';
 import { AuthHelper } from '../helpers/auth.helper';
 import { UserRepository } from 'src/common/repositories/user.repository';
 import { JwtPayload } from '../types/jwt.types';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 
 @Injectable()
 export class AdminService {
@@ -127,7 +132,44 @@ export class AdminService {
     };
   }
 
+  // log out service
   async logOut(id: string) {
     await this.userRepo.logOut(id);
+  }
+
+  // change password service
+  async changePassword(dto: ChangePasswordDto, id: string) {
+    const existingUser = await this.userRepo.findUser('id', id);
+
+    if (existingUser.role === 'user') {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+
+    if (!existingUser.password) {
+      throw new BadRequestException('No password set for this account');
+    }
+
+    const isValidPass = await this.userRepo.comparePassword(
+      dto.oldPassword,
+      existingUser.password,
+    );
+
+    if (!isValidPass) {
+      throw new BadRequestException('Old password is incorrect');
+    }
+
+    const hashPassword = await this.auth.hashPassword(dto.password);
+
+    await this.prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        password: hashPassword,
+      },
+    });
+
+    return {
+      message: 'Password changed successfully.',
+      data: null,
+    };
   }
 }
