@@ -9,6 +9,10 @@ import { MailModule } from './infra/mail/mail.module';
 import { UserModule } from './user/user.module';
 import { CommonModule } from './common/common.module';
 import { AdminModule } from './admin/admin.module';
+import { NumerologyController } from './numerology/numerology.controller';
+import { NumerologyService } from './numerology/numerology.service';
+import { SubscriptionService } from './subscription/subscription.service';
+import { SubscriptionController } from './subscription/subscription.controller';
 
 @Module({
   imports: [
@@ -20,7 +24,7 @@ import { AdminModule } from './admin/admin.module';
     UserModule,
     AdminModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, NumerologyController, SubscriptionController],
+  providers: [AppService, NumerologyService, SubscriptionService],
 })
 export class AppModule {}
