@@ -135,6 +135,9 @@ export class AdminService {
   // log out service
   async logOut(id: string) {
     await this.userRepo.logOut(id);
+    return {
+      message: `Log out successfully`,
+    };
   }
 
   // change password service
