@@ -12,18 +12,18 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { Auth } from 'auth/decorators/auth.decorator';
-import { CurrentUser } from 'auth/decorators/current-user.decorator';
-import type { JwtPayload } from 'auth/types/jwt.types';
+import { Auth } from 'src/auth/decorators/auth.decorator';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import type { JwtPayload } from 'src/auth/types/jwt.types';
 import { AdminService } from './admin.service';
-import { PaginationDto } from 'common/dto/pagination.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
-import { createFileUploadInterceptor } from 'common/interceptors/file-upload.interceptor';
+import { createFileUploadInterceptor } from 'src/common/interceptors/file-upload.interceptor';
 import {
   FileValidationPipe,
   type MulterFile,
-} from 'common/pipes/file-validation.pipe';
+} from 'src/common/pipes/file-validation.pipe';
 
 @Controller('admin')
 export class AdminController {

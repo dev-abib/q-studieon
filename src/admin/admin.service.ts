@@ -3,18 +3,18 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtPayload } from 'auth/types/jwt.types';
-import { PaginationDto } from 'common/dto/pagination.dto';
-import { UserRepository } from 'common/repositories/user.repository';
-import { PrismaService } from 'prisma/prisma.service';
+import { JwtPayload } from 'src/auth/types/jwt.types';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { UserRepository } from 'src/common/repositories/user.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateAdminDto } from './dto/create-admin.dto';
-import { AuthHelper } from 'auth/helpers/auth.helper';
+import { AuthHelper } from 'src/auth/helpers/auth.helper';
 import { UpdateAdminDto } from './dto/update-admin.dto';
-import { MulterFile } from 'common/pipes/file-validation.pipe';
-import { CloudinaryService } from 'common/services/cloudinary.service';
-import { EmailService } from 'infra/mail/mail.service';
-import { systemDeleteAccountTemplate } from 'infra/mail/templates/system/delete-account-syestem-confirmation.template';
+import { MulterFile } from 'src/common/pipes/file-validation.pipe';
+import { CloudinaryService } from 'src/common/services/cloudinary.service';
+import { EmailService } from 'src/infra/mail/mail.service';
+import { systemDeleteAccountTemplate } from 'src/infra/mail/templates/system/delete-account-syestem-confirmation.template';
 
 @Injectable()
 export class AdminService {

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SubscriptionService } from './subscription.service';
-import { PrismaService } from 'prisma/prisma.service';
-import { UserRepository } from 'common/repositories/user.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { UserRepository } from 'src/common/repositories/user.repository';
 
 describe('SubscriptionService', () => {
   let service: SubscriptionService;

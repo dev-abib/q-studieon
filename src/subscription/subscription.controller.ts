@@ -8,12 +8,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
-import type { JwtPayload } from 'auth/types/jwt.types';
+import type { JwtPayload } from 'src/auth/types/jwt.types';
 import { SubscriptionDto } from './dto/subscreption.dto';
-import { NoGuest } from 'auth/decorators/no-guest.decorator';
-import { Auth } from 'auth/decorators/auth.decorator';
-import { CurrentUser } from 'auth/decorators/current-user.decorator';
-import { Public } from 'auth/decorators/public.decorator';
+import { NoGuest } from 'src/auth/decorators/no-guest.decorator';
+import { Auth } from 'src/auth/decorators/auth.decorator';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller('subscription')
 export class SubscriptionController {
