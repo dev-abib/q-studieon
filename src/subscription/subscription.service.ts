@@ -216,8 +216,6 @@ export class SubscriptionService {
         : undefined;
     const plan: bilingCycle = interval === 'year' ? 'yearly' : 'monthly';
 
-    // Map Stripe statuses → your subscriptionStatus enum
-    // Note: your enum uses "trailing" (not Stripe's "trialing")
     const statusMap: Record<string, subscriptionStatus> = {
       active: 'active',
       trialing: 'trailing',
