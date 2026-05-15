@@ -94,7 +94,7 @@ export class SubscriptionService {
     };
   }
 
-  // cancel subscription status service
+  // cancel subscription service
   async cancelSubscription(userId: string): Promise<{ message: string }> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -102,6 +102,7 @@ export class SubscriptionService {
       throw new BadRequestException('No active subscription found.');
     }
 
+    // FIX 1: was 'trailing' (typo) — correct Stripe status is 'trialing'
     if (user.status !== 'active' && user.status !== 'trialing') {
       throw new BadRequestException('Subscription is not active');
     }
@@ -110,8 +111,25 @@ export class SubscriptionService {
       cancel_at_period_end: true,
     });
 
-    const periodEnd = user.currentPeriodEnd
-      ? new Date(user.currentPeriodEnd * 1000)
+    const rawSub = (await this.stripe.subscriptions.retrieve(
+      user.stripeSubscriptionId,
+    )) as unknown as Record<string, unknown>;
+
+    const currentPeriodEnd =
+      typeof rawSub.current_period_end === 'number'
+        ? rawSub.current_period_end
+        : null;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: 'cancelled',
+        currentPeriodEnd: currentPeriodEnd,
+      },
+    });
+
+    const periodEnd = currentPeriodEnd
+      ? new Date(currentPeriodEnd * 1000)
       : null;
 
     return {
@@ -129,11 +147,11 @@ export class SubscriptionService {
       throw new BadRequestException('No active subscription found.');
     }
 
-    const stripeSub = await this.stripe.subscriptions.retrieve(
+    const rawSub = (await this.stripe.subscriptions.retrieve(
       user.stripeSubscriptionId,
-    );
+    )) as unknown as Record<string, unknown>;
 
-    if (!stripeSub.cancel_at_period_end) {
+    if (!rawSub.cancel_at_period_end) {
       throw new BadRequestException(
         'Subscription is not pending cancellation — nothing to reactivate',
       );
@@ -199,21 +217,25 @@ export class SubscriptionService {
   private async onSubscriptionUpsert(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
 
-    // stripeSub.customer is the "cus_xxx" string stored in user.stripeCustomerId
+    const rawSub = stripeSub as Record<string, unknown>;
+
     const customerId =
-      'customer' in stripeSub
-        ? (stripeSub as { customer?: string }).customer
-        : undefined;
+      typeof rawSub.customer === 'string' ? rawSub.customer : undefined;
     if (!customerId) return;
 
-    const items =
-      'items' in stripeSub
-        ? (stripeSub as { items?: { data?: unknown[] } }).items?.data
-        : undefined;
-    const firstItem = Array.isArray(items) ? items[0] : undefined;
+    const items = Array.isArray(
+      (rawSub.items as Record<string, unknown> | undefined)?.data,
+    )
+      ? ((rawSub.items as Record<string, unknown>).data as unknown[])
+      : [];
+    const firstItem =
+      typeof items[0] === 'object' && items[0] !== null
+        ? (items[0] as Record<string, unknown>)
+        : null;
     const interval =
-      typeof firstItem === 'object' && firstItem !== null && 'plan' in firstItem
-        ? (firstItem as { plan?: { interval?: string } }).plan?.interval
+      typeof (firstItem?.plan as Record<string, unknown> | undefined)
+        ?.interval === 'string'
+        ? ((firstItem!.plan as Record<string, unknown>).interval as string)
         : undefined;
     const plan: bilingCycle = interval === 'year' ? 'yearly' : 'monthly';
 
@@ -226,34 +248,26 @@ export class SubscriptionService {
       unpaid: 'past_due',
     };
     const rawStatus =
-      'status' in stripeSub
-        ? (stripeSub as { status?: string }).status
-        : undefined;
+      typeof rawSub.status === 'string' ? rawSub.status : undefined;
     const status: subscriptionStatus =
       rawStatus && statusMap[rawStatus] ? statusMap[rawStatus] : 'incomplete';
 
     const isPaid = status === 'active' || status === 'trialing';
 
-    // If cancel_at_period_end = true, user is still paid till period end
-    const cancelAtPeriodEnd =
-      'cancel_at_period_end' in stripeSub
-        ? Boolean(
-            (stripeSub as { cancel_at_period_end?: unknown })
-              .cancel_at_period_end,
-          )
-        : false;
+    const cancelAtPeriodEnd = Boolean(rawSub.cancel_at_period_end);
+
     const resolvedStatus: subscriptionStatus = cancelAtPeriodEnd
       ? 'cancelled'
       : status;
 
     const subscriptionId =
-      'id' in stripeSub ? (stripeSub as { id?: string }).id : undefined;
-    const currentPeriodEnd =
-      'current_period_end' in stripeSub
-        ? (stripeSub as { current_period_end?: number }).current_period_end
-        : undefined;
+      typeof rawSub.id === 'string' ? rawSub.id : undefined;
 
-    // Find user by stripeCustomerId and update subscription fields
+    const currentPeriodEnd =
+      typeof rawSub.current_period_end === 'number'
+        ? rawSub.current_period_end
+        : null;
+
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
       data: {
@@ -261,7 +275,7 @@ export class SubscriptionService {
         status: resolvedStatus,
         billingCycle: plan,
         isPaid: cancelAtPeriodEnd ? true : isPaid,
-        currentPeriodEnd: currentPeriodEnd ?? undefined,
+        currentPeriodEnd: currentPeriodEnd,
         planKey: `pro_${plan}`,
       },
     });
@@ -270,10 +284,9 @@ export class SubscriptionService {
   // ── Webhook: subscription hard deleted ────────────────────────────────────
   private async onSubscriptionDeleted(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
+    const rawSub = stripeSub as Record<string, unknown>;
     const customerId =
-      'customer' in stripeSub
-        ? (stripeSub as { customer?: string }).customer
-        : undefined;
+      typeof rawSub.customer === 'string' ? rawSub.customer : undefined;
     if (!customerId) return;
 
     await this.prisma.user.updateMany({
@@ -291,10 +304,9 @@ export class SubscriptionService {
   // ── Webhook: payment failed ───────────────────────────────────────────────
   private async onPaymentFailed(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
+    const rawInvoice = invoice as Record<string, unknown>;
     const customerId =
-      'customer' in invoice
-        ? (invoice as { customer?: string }).customer
-        : undefined;
+      typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!customerId) return;
 
     await this.prisma.user.updateMany({
@@ -306,39 +318,39 @@ export class SubscriptionService {
     });
   }
 
-  // ── Webhook: payment succeeded (monthly/yearly renewal) ───────────────────
   private async onPaymentSucceeded(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
+    const rawInvoice = invoice as Record<string, unknown>;
+
     const billingReason =
-      'billing_reason' in invoice
-        ? (invoice as { billing_reason?: string }).billing_reason
+      typeof rawInvoice.billing_reason === 'string'
+        ? rawInvoice.billing_reason
         : undefined;
     if (billingReason !== 'subscription_cycle') return;
 
     const subscriptionId =
-      'subscription' in invoice
-        ? (invoice as { subscription?: string }).subscription
+      typeof rawInvoice.subscription === 'string'
+        ? rawInvoice.subscription
         : undefined;
     const customerId =
-      'customer' in invoice
-        ? (invoice as { customer?: string }).customer
-        : undefined;
+      typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!subscriptionId || !customerId) return;
 
-    const stripeSub = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const rawSub = (await this.stripe.subscriptions.retrieve(
+      subscriptionId,
+    )) as unknown as Record<string, unknown>;
+
     const currentPeriodEnd =
-      typeof stripeSub === 'object' &&
-      stripeSub !== null &&
-      'current_period_end' in stripeSub
-        ? (stripeSub as { current_period_end?: number }).current_period_end
-        : undefined;
+      typeof rawSub.current_period_end === 'number'
+        ? rawSub.current_period_end
+        : null;
 
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
       data: {
         status: 'active',
         isPaid: true,
-        currentPeriodEnd: currentPeriodEnd ?? undefined,
+        currentPeriodEnd: currentPeriodEnd,
       },
     });
   }
