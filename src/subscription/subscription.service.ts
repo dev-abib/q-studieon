@@ -102,22 +102,22 @@ export class SubscriptionService {
       throw new BadRequestException('No active subscription found.');
     }
 
-    if (user.status !== 'active' && user.status !== 'trailing') {
+    if (user.status !== 'active' && user.status !== 'trialing') {
       throw new BadRequestException('Subscription is not active');
     }
 
-    const subscription = await this.stripe.subscriptions.update(
-      user.stripeSubscriptionId,
-      { cancel_at_period_end: true },
-    );
+    await this.stripe.subscriptions.update(user.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
 
-    const periodEnd = new Date(
-      (subscription as unknown as { current_period_end: number })
-        .current_period_end * 1000,
-    );
+    const periodEnd = user.currentPeriodEnd
+      ? new Date(user.currentPeriodEnd * 1000)
+      : null;
 
     return {
-      message: `Your subscription will be cancelled on ${periodEnd.toDateString()}. You keep Pro access until then.`,
+      message: periodEnd
+        ? `Your subscription will be cancelled on ${periodEnd.toDateString()}. You keep Pro access until then.`
+        : `Your subscription has been scheduled for cancellation. You keep Pro access until the end of your billing period.`,
     };
   }
 
@@ -219,7 +219,7 @@ export class SubscriptionService {
 
     const statusMap: Record<string, subscriptionStatus> = {
       active: 'active',
-      trialing: 'trailing',
+      trialing: 'trialing',
       past_due: 'past_due',
       incomplete: 'incomplete',
       canceled: 'cancelled',
@@ -232,7 +232,7 @@ export class SubscriptionService {
     const status: subscriptionStatus =
       rawStatus && statusMap[rawStatus] ? statusMap[rawStatus] : 'incomplete';
 
-    const isPaid = status === 'active' || status === 'trailing';
+    const isPaid = status === 'active' || status === 'trialing';
 
     // If cancel_at_period_end = true, user is still paid till period end
     const cancelAtPeriodEnd =

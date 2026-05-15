@@ -7,7 +7,7 @@ enum AuthProvider {
 
 enum subscriptionStatus {
   free
-  trailing
+  trialing
   active
   past_due
   cancelled
