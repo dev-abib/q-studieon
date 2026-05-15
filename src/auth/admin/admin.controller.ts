@@ -11,7 +11,7 @@ import {
 import { AdminService } from './admin.service';
 import { Public } from '../decorators/public.decorator';
 import { AdminLoginDto } from '../dto/admin-login.dto';
-import { CookieHelper } from 'src/common/helpers/cookie.helper';
+import { CookieHelper } from '../../common/helpers/cookie.helper';
 import type { Request, Response } from 'express';
 import { Auth } from '../decorators/auth.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
