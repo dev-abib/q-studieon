@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
-import { AuthHelper } from 'src/auth/helpers/auth.helper';
-import { UserRepository } from 'src/common/repositories/user.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { AuthHelper } from '../auth/helpers/auth.helper';
+import { UserRepository } from '../common/repositories/user.repository';
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtModule } from '@nestjs/jwt';
-import { CloudinaryService } from 'src/common/services/cloudinary.service';
+import { CloudinaryService } from '../common/services/cloudinary.service';
 
 @Module({
   imports: [JwtModule.register({})],

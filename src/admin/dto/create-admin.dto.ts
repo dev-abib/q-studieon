@@ -6,7 +6,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { Match } from 'src/auth/decorators/match.decorator';
+import { Match } from '../../auth/decorators/match.decorator';
 
 export class CreateAdminDto {
   @IsEmail()

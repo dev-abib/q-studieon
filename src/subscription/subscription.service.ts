@@ -4,8 +4,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { bilingCycle, subscriptionStatus } from '@prisma/client';
-import { UserRepository } from 'src/common/repositories/user.repository';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { UserRepository } from '../common/repositories/user.repository';
+import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
 import { SubscriptionDto, PlanType } from './dto/subscreption.dto';
 
