@@ -14,6 +14,7 @@ import { NoGuest } from '../auth/decorators/no-guest.decorator';
 import { Auth } from '../auth/decorators/auth.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { RawResponse } from '../common/decorators/raw-response.decorator';
 
 @Controller('subscription')
 export class SubscriptionController {
@@ -45,10 +46,10 @@ export class SubscriptionController {
     return this.subscriptionService.reactivateSubscription(user.id);
   }
 
-  // webhook controller
   @Post('webhook')
   @Public()
   @HttpCode(200)
+  @RawResponse()
   async stripeWebhook(
     @Req() req: Request & { rawBody: Buffer },
     @Headers('stripe-signature') sig: string,

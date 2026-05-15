@@ -5,8 +5,10 @@ import {
   ExecutionContext,
   CallHandler,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { RAW_RESPONSE_KEY } from '../decorators/raw-response.decorator';
 
 interface RequestData<T> {
   message?: string;
@@ -22,12 +24,21 @@ interface SuccessResponse<T> {
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<
   RequestData<T>,
-  SuccessResponse<T>
+  unknown
 > {
+  constructor(private readonly reflector: Reflector) {}
+
   intercept(
     context: ExecutionContext,
     next: CallHandler<RequestData<T>>,
-  ): Observable<SuccessResponse<T>> {
+  ): Observable<unknown> {
+    const skip = this.reflector.getAllAndOverride<boolean>(RAW_RESPONSE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (skip) return next.handle();
+
     return next.handle().pipe(
       map(
         (data: RequestData<T>): SuccessResponse<T> => ({

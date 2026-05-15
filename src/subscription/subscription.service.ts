@@ -59,7 +59,7 @@ export class SubscriptionService {
   async crateCheckoutSession(
     userId: string,
     body: SubscriptionDto,
-  ): Promise<{ url: string }> {
+  ): Promise<{ message: string; data: { url: string } }> {
     const user = await this.userRepo.findUser('id', userId);
 
     if (user.isGuest) {
@@ -89,7 +89,8 @@ export class SubscriptionService {
     });
 
     return {
-      url: session.url as string,
+      message: 'Checkout session created successfully',
+      data: { url: session.url as string },
     };
   }
 
