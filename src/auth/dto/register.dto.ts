@@ -7,12 +7,20 @@ import {
   Matches,
   IsBoolean,
   Equals,
+  IsPhoneNumber,
 } from 'class-validator';
 import { Match } from '../decorators/match.decorator';
 
 export class RegisterDto {
   @IsEmail()
-  email: string;
+  email?: string;
+
+  @IsOptional()
+  @IsPhoneNumber(undefined, {
+    message:
+      'Please provide a valid phone number with country code (e.g. +8801711000000)',
+  })
+  phoneNumber?: string;
 
   @IsString()
   @MinLength(8)

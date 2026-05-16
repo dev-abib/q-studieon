@@ -116,7 +116,7 @@ export class UserService {
   // services
   // register account service
   async register(dto: RegisterDto) {
-    const isExisting = await this.prisma.user.findUnique({
+    const isExisting = await this.prisma.user.findFirst({
       where: {
         email: dto.email,
       },
@@ -187,13 +187,13 @@ export class UserService {
 
     let isMailSent: boolean = false;
 
-    if (!user.isGuest) {
+    if (!user.isGuest && user.email) {
       isMailSent = await this.email.sendEmail({
-        to: user.email as string,
+        to: user.email,
         subject: `Account verification otp ${process.env.MAIL_FROM_NAME as string}`,
         html: accountVerificationTemplate({
           name: user.name as string,
-          email: user.email as string,
+          email: user.email,
           otp: otp,
         }),
       });

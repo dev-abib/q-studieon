@@ -6,7 +6,6 @@ import {
   Param,
   Delete,
   HttpCode,
-  ValidationPipe,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
