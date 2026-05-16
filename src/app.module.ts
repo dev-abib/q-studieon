@@ -16,6 +16,9 @@ import { SubscriptionController } from './subscription/subscription.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksService } from './tasks/tasks.service';
 import { TasksModule } from './tasks/tasks.module';
+import { DynamicPageController } from './dynamic-page/dynamic-page.controller';
+import { DynamicPageService } from './dynamic-page/dynamic-page.service';
+import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
 
 @Module({
   imports: [
@@ -28,8 +31,9 @@ import { TasksModule } from './tasks/tasks.module';
     UserModule,
     AdminModule,
     TasksModule,
+    DynamicPageModule,
   ],
-  controllers: [AppController, NumerologyController, SubscriptionController],
-  providers: [AppService, NumerologyService, SubscriptionService, TasksService],
+  controllers: [AppController, NumerologyController, SubscriptionController, DynamicPageController],
+  providers: [AppService, NumerologyService, SubscriptionService, TasksService, DynamicPageService],
 })
 export class AppModule {}
