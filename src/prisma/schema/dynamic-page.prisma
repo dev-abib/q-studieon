@@ -2,6 +2,6 @@ model DynamicPage {
   id          String   @id @default(cuid())
   title       String
   slug        String   @unique
-  description String
+  description String   
   createdAt   DateTime @default(now())
 }

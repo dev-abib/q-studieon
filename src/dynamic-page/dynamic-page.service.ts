@@ -19,7 +19,7 @@ export class DynamicPageService {
     });
 
     if (page) {
-      return new ConflictException('This page already exists');
+      throw new ConflictException('This page already exists');
     }
 
     page = await this.prisma.dynamicPage.create({
@@ -45,7 +45,7 @@ export class DynamicPageService {
     });
 
     if (!page) {
-      return new NotFoundException('Page not found');
+      throw new NotFoundException('Page not found');
     }
 
     return {
@@ -111,7 +111,6 @@ export class DynamicPageService {
   }
 
   // update dynamic page service
-  // get dynamic page by slug service
   async updateDynamicPageBySlug(slug: string, dto: UpdateDynamicPageDto) {
     const page = await this.prisma.dynamicPage.update({
       where: { slug: slug },
@@ -123,7 +122,7 @@ export class DynamicPageService {
     });
 
     if (!page) {
-      return new NotFoundException('Page not found');
+      throw new NotFoundException('Page not found');
     }
 
     return {
