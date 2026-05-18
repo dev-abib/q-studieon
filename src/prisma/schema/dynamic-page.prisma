@@ -3,4 +3,5 @@ model DynamicPage {
   title       String
   slug        String   @unique
   description String
+  createdAt   DateTime @default(now())
 }

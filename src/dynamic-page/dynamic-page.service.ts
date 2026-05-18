@@ -6,6 +6,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateDynamicPageDto } from './dto/create-dynamic-page.dto';
 import { UpdateDynamicPageDto } from './dto/update-dynamic-page.dto';
+import { GetAllDynamicPagesDto } from './dto/get-all-page.dto';
 
 @Injectable()
 export class DynamicPageService {
@@ -55,18 +56,56 @@ export class DynamicPageService {
     };
   }
 
-  // get all dynamic page service
-  async getAllDynamicPage() {
-    const pages = await this.prisma.dynamicPage.findMany();
+  async getAllDynamicPage(dto: GetAllDynamicPagesDto) {
+    const {
+      page = 1,
+      limit = 6,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = dto;
 
-    if (pages.length < 1) {
-      return new NotFoundException('Currently there is no dynamic page');
+    const skip = (page - 1) * limit;
+
+    // Build search filter (matches title OR slug)
+    const where = search
+      ? {
+          OR: [
+            { title: { contains: search, mode: 'insensitive' as const } },
+            { slug: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    // Run count + paginated fetch in parallel
+    const [total, pages] = await Promise.all([
+      this.prisma.dynamicPage.count({ where }),
+      this.prisma.dynamicPage.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    if (total === 0) {
+      throw new NotFoundException('No dynamic pages found');
     }
 
+    const totalPages = Math.ceil(total / limit);
+
     return {
-      message: `Successfully retrieved all dynamic pages`,
+      message: 'Successfully retrieved all dynamic pages',
       data: {
         pages,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasPrevPage: page > 1,
+          hasNextPage: page < totalPages,
+        },
       },
     };
   }

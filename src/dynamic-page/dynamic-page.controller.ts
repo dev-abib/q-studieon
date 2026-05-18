@@ -6,11 +6,13 @@ import {
   Param,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 import { DynamicPageService } from './dynamic-page.service';
 import { CreateDynamicPageDto } from './dto/create-dynamic-page.dto';
 import { UpdateDynamicPageDto } from './dto/update-dynamic-page.dto';
+import { GetAllDynamicPagesDto } from './dto/get-all-page.dto';
 
 @Controller('dynamic-page')
 export class DynamicPageController {
@@ -23,11 +25,10 @@ export class DynamicPageController {
     return this.dynamicPageService.createDynamicPage(dto);
   }
 
-  // get all dynamic pages controller
   @Get('get-all-pages')
   @Auth('admin')
-  getAllDynamicPages() {
-    return this.dynamicPageService.getAllDynamicPage();
+  getAllDynamicPages(@Query() dto: GetAllDynamicPagesDto) {
+    return this.dynamicPageService.getAllDynamicPage(dto);
   }
 
   // get dynamic page by slug controller
