@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateDynamicPageDto } from './dto/create-dynamic-page.dto';
+import { UpdateDynamicPageDto } from './dto/update-dynamic-page.dto';
 
 @Injectable()
 export class DynamicPageService {
@@ -23,7 +24,7 @@ export class DynamicPageService {
     page = await this.prisma.dynamicPage.create({
       data: {
         title: dto.title,
-        slug: dto.title,
+        slug: dto.slug,
         description: dto.description,
       },
     });
@@ -48,6 +49,9 @@ export class DynamicPageService {
 
     return {
       message: `Dynamic page retrieved successfully`,
+      data: {
+        page,
+      },
     };
   }
 
@@ -63,6 +67,30 @@ export class DynamicPageService {
       message: `Successfully retrieved all dynamic pages`,
       data: {
         pages,
+      },
+    };
+  }
+
+  // update dynamic page service
+  // get dynamic page by slug service
+  async updateDynamicPageBySlug(slug: string, dto: UpdateDynamicPageDto) {
+    const page = await this.prisma.dynamicPage.update({
+      where: { slug: slug },
+      data: {
+        title: dto.title,
+        slug: dto.slug,
+        description: dto.description,
+      },
+    });
+
+    if (!page) {
+      return new NotFoundException('Page not found');
+    }
+
+    return {
+      message: `Dynamic page updated successfully`,
+      data: {
+        page,
       },
     };
   }
