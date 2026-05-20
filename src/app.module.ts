@@ -19,6 +19,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { DynamicPageController } from './dynamic-page/dynamic-page.controller';
 import { DynamicPageService } from './dynamic-page/dynamic-page.service';
 import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
     AdminModule,
     TasksModule,
     DynamicPageModule,
+    AiModule,
   ],
   controllers: [AppController, NumerologyController, SubscriptionController, DynamicPageController],
   providers: [AppService, NumerologyService, SubscriptionService, TasksService, DynamicPageService],
