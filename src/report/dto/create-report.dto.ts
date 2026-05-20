@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsNumber, IsString } from 'class-validator';
 
-export class AddressDto {
+export class CreateReportDto {
   @IsString()
   address!: string;
 
@@ -9,11 +9,11 @@ export class AddressDto {
   @Type(() => Number)
   entranceDegrees!: number;
 
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber()
   @Type(() => Number)
   latitude!: number;
 
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber()
   @Type(() => Number)
   longitude!: number;
 

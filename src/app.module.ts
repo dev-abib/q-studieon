@@ -9,8 +9,6 @@ import { MailModule } from './infra/mail/mail.module';
 import { UserModule } from './user/user.module';
 import { CommonModule } from './common/common.module';
 import { AdminModule } from './admin/admin.module';
-import { NumerologyController } from './numerology/numerology.controller';
-import { NumerologyService } from './numerology/numerology.service';
 import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionController } from './subscription/subscription.controller';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -19,7 +17,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { DynamicPageController } from './dynamic-page/dynamic-page.controller';
 import { DynamicPageService } from './dynamic-page/dynamic-page.service';
 import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
-import { AiModule } from './ai/ai.module';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -33,9 +31,14 @@ import { AiModule } from './ai/ai.module';
     AdminModule,
     TasksModule,
     DynamicPageModule,
-    AiModule,
+    ReportModule,
   ],
-  controllers: [AppController, NumerologyController, SubscriptionController, DynamicPageController],
-  providers: [AppService, NumerologyService, SubscriptionService, TasksService, DynamicPageService],
+  controllers: [AppController, SubscriptionController, DynamicPageController],
+  providers: [
+    AppService,
+    SubscriptionService,
+    TasksService,
+    DynamicPageService,
+  ],
 })
 export class AppModule {}
