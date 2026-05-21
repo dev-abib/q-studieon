@@ -72,6 +72,25 @@ export class SubscriptionService {
     return interval === 'year' ? 'yearly' : 'monthly';
   }
 
+  // ── helper: find user by stripeCustomerId with fallback to subscriptionId ──
+  private async findUserByStripeIds(
+    customerId: string,
+    subscriptionId?: string,
+  ) {
+    const byCustomer = await this.prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
+    if (byCustomer) return byCustomer;
+
+    if (subscriptionId) {
+      return this.prisma.user.findFirst({
+        where: { stripeSubscriptionId: subscriptionId },
+      });
+    }
+
+    return null;
+  }
+
   // ── checkout session ──────────────────────────────────────────────────────
   async crateCheckoutSession(
     userId: string,
@@ -304,24 +323,30 @@ export class SubscriptionService {
         ? rawSub.current_period_end
         : null;
 
-    // fetch user before update to snapshot previous state
-    const existingUser = await this.prisma.user.findFirst({
-      where: { stripeCustomerId: customerId },
-    });
+    // fetch user with fallback to subscriptionId in case stripeCustomerId
+    // hasn't been saved yet when this webhook fires
+    const existingUser = await this.findUserByStripeIds(
+      customerId,
+      subscriptionId,
+    );
 
-    // FIX: never downgrade an already-active/trialing user to incomplete.
-    // Stripe can fire customer.subscription.updated with status=incomplete
-    // after invoice.payment_succeeded has already set the user to active,
-    // which would silently wipe out the active status and break the dashboard count.
+    // never downgrade an already-active/trialing user to incomplete
     const shouldUpdateStatus = !(
       (existingUser?.status === 'active' ||
         existingUser?.status === 'trialing') &&
       resolvedStatus === 'incomplete'
     );
 
+    // update by customerId OR subscriptionId so the row is always found
     await this.prisma.user.updateMany({
-      where: { stripeCustomerId: customerId },
+      where: {
+        OR: [
+          { stripeCustomerId: customerId },
+          ...(subscriptionId ? [{ stripeSubscriptionId: subscriptionId }] : []),
+        ],
+      },
       data: {
+        stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId ?? undefined,
         billingCycle: plan,
         isPaid: cancelAtPeriodEnd ? true : isPaid,
@@ -363,16 +388,26 @@ export class SubscriptionService {
   private async onSubscriptionDeleted(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
     const rawSub = stripeSub as Record<string, unknown>;
+
     const customerId =
       typeof rawSub.customer === 'string' ? rawSub.customer : undefined;
     if (!customerId) return;
 
-    const existingUser = await this.prisma.user.findFirst({
-      where: { stripeCustomerId: customerId },
-    });
+    const subscriptionId =
+      typeof rawSub.id === 'string' ? rawSub.id : undefined;
+
+    const existingUser = await this.findUserByStripeIds(
+      customerId,
+      subscriptionId,
+    );
 
     await this.prisma.user.updateMany({
-      where: { stripeCustomerId: customerId },
+      where: {
+        OR: [
+          { stripeCustomerId: customerId },
+          ...(subscriptionId ? [{ stripeSubscriptionId: subscriptionId }] : []),
+        ],
+      },
       data: {
         stripeSubscriptionId: null,
         status: 'cancelled',
@@ -404,8 +439,6 @@ export class SubscriptionService {
       typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!customerId) return;
 
-    // derive billing cycle from Stripe directly — don't trust user record
-    // which may not be updated yet when this webhook fires
     const subscriptionId =
       typeof rawInvoice.subscription === 'string'
         ? rawInvoice.subscription
@@ -419,12 +452,18 @@ export class SubscriptionService {
       billingCycle = this.getBillingCycleFromSub(rawSub);
     }
 
-    const existingUser = await this.prisma.user.findFirst({
-      where: { stripeCustomerId: customerId },
-    });
+    const existingUser = await this.findUserByStripeIds(
+      customerId,
+      subscriptionId,
+    );
 
     await this.prisma.user.updateMany({
-      where: { stripeCustomerId: customerId },
+      where: {
+        OR: [
+          { stripeCustomerId: customerId },
+          ...(subscriptionId ? [{ stripeSubscriptionId: subscriptionId }] : []),
+        ],
+      },
       data: {
         status: 'past_due',
         isPaid: false,
@@ -501,17 +540,23 @@ export class SubscriptionService {
         ? rawSub.current_period_end
         : null;
 
-    // derive billing cycle from Stripe directly — don't trust user record
-    // which may not be updated yet when this webhook fires
     const billingCycle = this.getBillingCycleFromSub(rawSub);
 
-    const existingUser = await this.prisma.user.findFirst({
-      where: { stripeCustomerId: customerId },
-    });
+    // fallback to subscriptionId lookup in case stripeCustomerId not saved yet
+    const existingUser = await this.findUserByStripeIds(
+      customerId,
+      subscriptionId,
+    );
 
     await this.prisma.user.updateMany({
-      where: { stripeCustomerId: customerId },
+      where: {
+        OR: [
+          { stripeCustomerId: customerId },
+          { stripeSubscriptionId: subscriptionId },
+        ],
+      },
       data: {
+        stripeCustomerId: customerId,
         status: 'active',
         isPaid: true,
         currentPeriodEnd: currentPeriodEnd,
