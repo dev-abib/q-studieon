@@ -365,13 +365,48 @@ export class SubscriptionService {
     }
   }
 
+  // ── helper: derive billing cycle from a retrieved Stripe subscription ─────
+  private getBillingCycleFromSub(rawSub: Record<string, unknown>): bilingCycle {
+    const items = Array.isArray(
+      (rawSub.items as Record<string, unknown> | undefined)?.data,
+    )
+      ? ((rawSub.items as Record<string, unknown>).data as unknown[])
+      : [];
+    const firstItem =
+      typeof items[0] === 'object' && items[0] !== null
+        ? (items[0] as Record<string, unknown>)
+        : null;
+    const interval =
+      typeof (firstItem?.plan as Record<string, unknown> | undefined)
+        ?.interval === 'string'
+        ? ((firstItem!.plan as Record<string, unknown>).interval as string)
+        : undefined;
+    return interval === 'year' ? 'yearly' : 'monthly';
+  }
+
   // ── Webhook: payment failed ───────────────────────────────────────────────
   private async onPaymentFailed(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
     const rawInvoice = invoice as Record<string, unknown>;
+
     const customerId =
       typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!customerId) return;
+
+    // derive billing cycle from Stripe directly — don't trust user record
+    // which may not be updated yet when this webhook fires
+    const subscriptionId =
+      typeof rawInvoice.subscription === 'string'
+        ? rawInvoice.subscription
+        : undefined;
+
+    let billingCycle: bilingCycle = 'monthly';
+    if (subscriptionId) {
+      const rawSub = (await this.stripe.subscriptions.retrieve(
+        subscriptionId,
+      )) as unknown as Record<string, unknown>;
+      billingCycle = this.getBillingCycleFromSub(rawSub);
+    }
 
     const existingUser = await this.prisma.user.findFirst({
       where: { stripeCustomerId: customerId },
@@ -399,7 +434,7 @@ export class SubscriptionService {
                 ? rawInvoice.currency
                 : 'usd',
             status: 'failed',
-            billingCycle: existingUser.billingCycle ?? 'monthly',
+            billingCycle,
             stripeInvoiceId:
               typeof rawInvoice.id === 'string' ? rawInvoice.id : undefined,
             paidAt: null,
@@ -410,7 +445,7 @@ export class SubscriptionService {
             userId: existingUser.id,
             event: 'payment_failed',
             status: 'past_due',
-            billingCycle: existingUser.billingCycle ?? undefined,
+            billingCycle,
             previousStatus: existingUser.status ?? undefined,
             previousBillingCycle: existingUser.billingCycle ?? undefined,
           },
@@ -428,7 +463,14 @@ export class SubscriptionService {
       typeof rawInvoice.billing_reason === 'string'
         ? rawInvoice.billing_reason
         : undefined;
-    if (billingReason !== 'subscription_cycle') return;
+
+    // subscription_create  = first payment on a new subscription
+    // subscription_cycle   = recurring renewal payment
+    if (
+      billingReason !== 'subscription_cycle' &&
+      billingReason !== 'subscription_create'
+    )
+      return;
 
     const subscriptionId =
       typeof rawInvoice.subscription === 'string'
@@ -438,6 +480,7 @@ export class SubscriptionService {
       typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!subscriptionId || !customerId) return;
 
+    // retrieve subscription once — used for both period end and billing cycle
     const rawSub = (await this.stripe.subscriptions.retrieve(
       subscriptionId,
     )) as unknown as Record<string, unknown>;
@@ -446,6 +489,10 @@ export class SubscriptionService {
       typeof rawSub.current_period_end === 'number'
         ? rawSub.current_period_end
         : null;
+
+    // derive billing cycle from Stripe directly — don't trust user record
+    // which may not be updated yet when this webhook fires
+    const billingCycle = this.getBillingCycleFromSub(rawSub);
 
     const existingUser = await this.prisma.user.findFirst({
       where: { stripeCustomerId: customerId },
@@ -474,7 +521,7 @@ export class SubscriptionService {
                 ? rawInvoice.currency
                 : 'usd',
             status: 'succeeded',
-            billingCycle: existingUser.billingCycle ?? 'monthly',
+            billingCycle,
             stripeInvoiceId:
               typeof rawInvoice.id === 'string' ? rawInvoice.id : undefined,
             stripePaymentIntentId:
@@ -487,9 +534,10 @@ export class SubscriptionService {
         this.prisma.subscriptionEvent.create({
           data: {
             userId: existingUser.id,
-            event: 'renewed',
+            event:
+              billingReason === 'subscription_create' ? 'activated' : 'renewed',
             status: 'active',
-            billingCycle: existingUser.billingCycle ?? undefined,
+            billingCycle,
             previousStatus: existingUser.status ?? undefined,
             previousBillingCycle: existingUser.billingCycle ?? undefined,
           },
