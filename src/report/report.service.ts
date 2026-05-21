@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
-import { PlaceDetailsHelper } from 'src/auth/helpers/place-details.helper';
-import { NumerologyHelpers } from 'src/auth/helpers/numerology-helpers';
-import { AiHelper, ReportAccessLevel } from 'src/auth/helpers/ai-helper';
+import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
+import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
+import { AiHelper, ReportAccessLevel } from '../auth/helpers/ai-helper';
 
 import { CreateReportDto } from './dto/create-report.dto';
 

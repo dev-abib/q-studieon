@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateDynamicPageDto } from './dto/create-dynamic-page.dto';
 import { UpdateDynamicPageDto } from './dto/update-dynamic-page.dto';
 import { GetAllDynamicPagesDto } from './dto/get-all-page.dto';

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateReportDto } from 'src/report/dto/create-report.dto';
+import { CreateReportDto } from '../../report/dto/create-report.dto';
 
 interface NumerologyMeaning {
   tags: string[];

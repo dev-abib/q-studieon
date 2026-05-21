@@ -691,5 +691,4 @@ export class AdminService {
       },
     };
   }
-  
 }

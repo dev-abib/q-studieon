@@ -8,7 +8,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { Auth } from 'src/auth/decorators/auth.decorator';
+import { Auth } from '../auth/decorators/auth.decorator';
 import { DynamicPageService } from './dynamic-page.service';
 import { CreateDynamicPageDto } from './dto/create-dynamic-page.dto';
 import { UpdateDynamicPageDto } from './dto/update-dynamic-page.dto';

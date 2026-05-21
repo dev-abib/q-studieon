@@ -1,6 +1,6 @@
 import { Controller, Body, Post } from '@nestjs/common';
 import { ReportService } from './report.service';
-import { Public } from 'src/auth/decorators/public.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateReportDto } from './dto/create-report.dto';
 
 @Controller('report')

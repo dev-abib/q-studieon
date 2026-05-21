@@ -24,7 +24,7 @@ import {
   FileValidationPipe,
   type MulterFile,
 } from '../common/pipes/file-validation.pipe';
-import { Public } from 'src/auth/decorators/public.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('admin')
 export class AdminController {
