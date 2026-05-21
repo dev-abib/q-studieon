@@ -48,7 +48,6 @@ model User {
 
   authProvider AuthProvider? @default(local)
 
-  planKey      String?
   billingCycle bilingCycle?        @default(monthly)
   status       subscriptionStatus? @default(free)
 
@@ -66,5 +65,15 @@ model User {
   guestDeviceId      String?
   isResetRequest     Boolean?  @default(false)
 
+  // relations
+  payments           Payment[]
+  subscriptionEvents SubscriptionEvent[]
+  reports            Report[]
+
+  // indexes
+  @@index([createdAt])
+  @@index([isGuest])
+  @@index([status])
+  @@index([isPaid])
   @@map("users")
 }

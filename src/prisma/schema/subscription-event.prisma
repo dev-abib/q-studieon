@@ -1,0 +1,31 @@
+enum SubscriptionEventType {
+  trial_started
+  activated
+  upgraded
+  downgraded
+  cancelled
+  renewed
+  payment_failed
+  reactivated
+}
+
+model SubscriptionEvent {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  event        SubscriptionEventType
+  status       subscriptionStatus
+  billingCycle bilingCycle?
+
+  // snapshot of what changed
+  previousStatus       subscriptionStatus?
+  previousBillingCycle bilingCycle?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([event])
+  @@map("subscription_events")
+}

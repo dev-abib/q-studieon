@@ -1,0 +1,28 @@
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+}
+
+model Payment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  amount       Int // in cents, e.g. 2999 = $29.99
+  currency     String        @default("usd")
+  status       PaymentStatus
+  billingCycle bilingCycle
+
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+  @@map("payments")
+}

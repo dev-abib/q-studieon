@@ -22,7 +22,7 @@ export class SubscriptionService {
     });
   }
 
-  //  get price id helper
+  // get price id helper
   private getPriceId(plan: PlanType | bilingCycle): string {
     const priceId =
       plan === 'monthly'
@@ -33,7 +33,7 @@ export class SubscriptionService {
     return priceId;
   }
 
-  //  get customer helper
+  // get or create stripe customer helper
   private async getOrCreateStripeCustomer(userId: string): Promise<string> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -47,9 +47,7 @@ export class SubscriptionService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: {
-        stripeCustomerId: customer.id,
-      },
+      data: { stripeCustomerId: customer.id },
     });
 
     return customer.id;
@@ -102,7 +100,6 @@ export class SubscriptionService {
       throw new BadRequestException('No active subscription found.');
     }
 
-    // FIX 1: was 'trailing' (typo) — correct Stripe status is 'trialing'
     if (user.status !== 'active' && user.status !== 'trialing') {
       throw new BadRequestException('Subscription is not active');
     }
@@ -125,6 +122,17 @@ export class SubscriptionService {
       data: {
         status: 'cancelled',
         currentPeriodEnd: currentPeriodEnd,
+      },
+    });
+
+    await this.prisma.subscriptionEvent.create({
+      data: {
+        userId: user.id,
+        event: 'cancelled',
+        status: 'cancelled',
+        billingCycle: user.billingCycle ?? undefined,
+        previousStatus: user.status ?? undefined,
+        previousBillingCycle: user.billingCycle ?? undefined,
       },
     });
 
@@ -159,6 +167,17 @@ export class SubscriptionService {
 
     await this.stripe.subscriptions.update(user.stripeSubscriptionId, {
       cancel_at_period_end: false,
+    });
+
+    await this.prisma.subscriptionEvent.create({
+      data: {
+        userId: user.id,
+        event: 'reactivated',
+        status: 'active',
+        billingCycle: user.billingCycle ?? undefined,
+        previousStatus: 'cancelled',
+        previousBillingCycle: user.billingCycle ?? undefined,
+      },
     });
 
     return {
@@ -253,20 +272,22 @@ export class SubscriptionService {
       rawStatus && statusMap[rawStatus] ? statusMap[rawStatus] : 'incomplete';
 
     const isPaid = status === 'active' || status === 'trialing';
-
     const cancelAtPeriodEnd = Boolean(rawSub.cancel_at_period_end);
-
     const resolvedStatus: subscriptionStatus = cancelAtPeriodEnd
       ? 'cancelled'
       : status;
 
     const subscriptionId =
       typeof rawSub.id === 'string' ? rawSub.id : undefined;
-
     const currentPeriodEnd =
       typeof rawSub.current_period_end === 'number'
         ? rawSub.current_period_end
         : null;
+
+    // fetch user before update to snapshot previous state
+    const existingUser = await this.prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
 
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
@@ -276,9 +297,36 @@ export class SubscriptionService {
         billingCycle: plan,
         isPaid: cancelAtPeriodEnd ? true : isPaid,
         currentPeriodEnd: currentPeriodEnd,
-        planKey: `pro_${plan}`,
       },
     });
+
+    if (existingUser) {
+      const isUpgrade =
+        existingUser.billingCycle === 'monthly' && plan === 'yearly';
+      const isDowngrade =
+        existingUser.billingCycle === 'yearly' && plan === 'monthly';
+
+      const eventType = cancelAtPeriodEnd
+        ? 'cancelled'
+        : status === 'trialing'
+          ? 'trial_started'
+          : isUpgrade
+            ? 'upgraded'
+            : isDowngrade
+              ? 'downgraded'
+              : 'activated';
+
+      await this.prisma.subscriptionEvent.create({
+        data: {
+          userId: existingUser.id,
+          event: eventType,
+          status: resolvedStatus,
+          billingCycle: plan,
+          previousStatus: existingUser.status ?? undefined,
+          previousBillingCycle: existingUser.billingCycle ?? undefined,
+        },
+      });
+    }
   }
 
   // ── Webhook: subscription hard deleted ────────────────────────────────────
@@ -289,6 +337,10 @@ export class SubscriptionService {
       typeof rawSub.customer === 'string' ? rawSub.customer : undefined;
     if (!customerId) return;
 
+    const existingUser = await this.prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
+
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
       data: {
@@ -296,9 +348,21 @@ export class SubscriptionService {
         status: 'cancelled',
         isPaid: false,
         currentPeriodEnd: null,
-        planKey: null,
       },
     });
+
+    if (existingUser) {
+      await this.prisma.subscriptionEvent.create({
+        data: {
+          userId: existingUser.id,
+          event: 'cancelled',
+          status: 'cancelled',
+          billingCycle: existingUser.billingCycle ?? undefined,
+          previousStatus: existingUser.status ?? undefined,
+          previousBillingCycle: existingUser.billingCycle ?? undefined,
+        },
+      });
+    }
   }
 
   // ── Webhook: payment failed ───────────────────────────────────────────────
@@ -309,6 +373,10 @@ export class SubscriptionService {
       typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!customerId) return;
 
+    const existingUser = await this.prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
+
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
       data: {
@@ -316,8 +384,42 @@ export class SubscriptionService {
         isPaid: false,
       },
     });
+
+    if (existingUser) {
+      await Promise.all([
+        this.prisma.payment.create({
+          data: {
+            userId: existingUser.id,
+            amount:
+              typeof rawInvoice.amount_due === 'number'
+                ? rawInvoice.amount_due
+                : 0,
+            currency:
+              typeof rawInvoice.currency === 'string'
+                ? rawInvoice.currency
+                : 'usd',
+            status: 'failed',
+            billingCycle: existingUser.billingCycle ?? 'monthly',
+            stripeInvoiceId:
+              typeof rawInvoice.id === 'string' ? rawInvoice.id : undefined,
+            paidAt: null,
+          },
+        }),
+        this.prisma.subscriptionEvent.create({
+          data: {
+            userId: existingUser.id,
+            event: 'payment_failed',
+            status: 'past_due',
+            billingCycle: existingUser.billingCycle ?? undefined,
+            previousStatus: existingUser.status ?? undefined,
+            previousBillingCycle: existingUser.billingCycle ?? undefined,
+          },
+        }),
+      ]);
+    }
   }
 
+  // ── Webhook: payment succeeded ────────────────────────────────────────────
   private async onPaymentSucceeded(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
     const rawInvoice = invoice as Record<string, unknown>;
@@ -345,6 +447,10 @@ export class SubscriptionService {
         ? rawSub.current_period_end
         : null;
 
+    const existingUser = await this.prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
+
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
       data: {
@@ -353,5 +459,42 @@ export class SubscriptionService {
         currentPeriodEnd: currentPeriodEnd,
       },
     });
+
+    if (existingUser) {
+      await Promise.all([
+        this.prisma.payment.create({
+          data: {
+            userId: existingUser.id,
+            amount:
+              typeof rawInvoice.amount_paid === 'number'
+                ? rawInvoice.amount_paid
+                : 0,
+            currency:
+              typeof rawInvoice.currency === 'string'
+                ? rawInvoice.currency
+                : 'usd',
+            status: 'succeeded',
+            billingCycle: existingUser.billingCycle ?? 'monthly',
+            stripeInvoiceId:
+              typeof rawInvoice.id === 'string' ? rawInvoice.id : undefined,
+            stripePaymentIntentId:
+              typeof rawInvoice.payment_intent === 'string'
+                ? rawInvoice.payment_intent
+                : undefined,
+            paidAt: new Date(),
+          },
+        }),
+        this.prisma.subscriptionEvent.create({
+          data: {
+            userId: existingUser.id,
+            event: 'renewed',
+            status: 'active',
+            billingCycle: existingUser.billingCycle ?? undefined,
+            previousStatus: existingUser.status ?? undefined,
+            previousBillingCycle: existingUser.billingCycle ?? undefined,
+          },
+        }),
+      ]);
+    }
   }
 }

@@ -24,6 +24,7 @@ import {
   FileValidationPipe,
   type MulterFile,
 } from '../common/pipes/file-validation.pipe';
+import { Public } from 'src/auth/decorators/public.decorator';
 
 @Controller('admin')
 export class AdminController {
@@ -94,5 +95,14 @@ export class AdminController {
   @HttpCode(200)
   deleteUser(@Param('id') id: string, @CurrentUser() admin: JwtPayload) {
     return this.adminService.deleteAdminOrUser(id, false, admin);
+  }
+
+  // get dashboard analytics
+  @Get('dashboard-analytics')
+  // @Auth('admin')
+  @Public()
+  @HttpCode(200)
+  getDashboardAnalytics() {
+    return this.adminService.getDashboardAnalytics();
   }
 }

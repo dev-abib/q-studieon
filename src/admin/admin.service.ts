@@ -239,4 +239,288 @@ export class AdminService {
       },
     };
   }
+
+  async getDashboardAnalytics() {
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const startOfYesterday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+    );
+
+    const [
+      // ── stat cards ──────────────────────────────────────────
+      totalUsers,
+      usersThisMonth,
+      usersLastMonth,
+      activeSubscriptions,
+      subscriptionsThisMonth,
+      subscriptionsLastMonth,
+      guestUsers,
+      reportsToday,
+      reportsYesterday,
+
+      // ── subscription plans breakdown ────────────────────────
+      monthlyPlanCount,
+      yearlyPlanCount,
+
+      // ── revenue breakdown summary ───────────────────────────
+      monthlyRevenue,
+      yearlyRevenue,
+    ] = await Promise.all([
+      // stat cards
+      this.prisma.user.count(),
+      this.prisma.user.count({
+        where: { createdAt: { gte: startOfThisMonth } },
+      }),
+      this.prisma.user.count({
+        where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
+      }),
+
+      this.prisma.user.count({
+        where: { status: { in: ['active', 'trialing'] } },
+      }),
+      this.prisma.user.count({
+        where: {
+          status: { in: ['active', 'trialing'] },
+          createdAt: { gte: startOfThisMonth },
+        },
+      }),
+      this.prisma.user.count({
+        where: {
+          status: { in: ['active', 'trialing'] },
+          createdAt: { gte: startOfLastMonth, lt: startOfThisMonth },
+        },
+      }),
+
+      this.prisma.user.count({ where: { isGuest: true } }),
+
+      this.prisma.report.count({ where: { createdAt: { gte: startOfToday } } }),
+      this.prisma.report.count({
+        where: { createdAt: { gte: startOfYesterday, lt: startOfToday } },
+      }),
+
+      // plan breakdown
+      this.prisma.user.count({
+        where: {
+          billingCycle: 'monthly',
+          status: { in: ['active', 'trialing'] },
+        },
+      }),
+      this.prisma.user.count({
+        where: {
+          billingCycle: 'yearly',
+          status: { in: ['active', 'trialing'] },
+        },
+      }),
+
+      // revenue
+      this.prisma.payment.aggregate({
+        where: { status: 'succeeded', billingCycle: 'monthly' },
+        _sum: { amount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { status: 'succeeded', billingCycle: 'yearly' },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // ── monthly revenue chart (last 6 months) ───────────────
+    const revenueChart = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        const start = new Date(date.getFullYear(), date.getMonth(), 1);
+        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+        return this.prisma.payment
+          .aggregate({
+            where: { status: 'succeeded', createdAt: { gte: start, lt: end } },
+            _sum: { amount: true },
+          })
+          .then((r) => ({
+            month: date.toLocaleString('default', { month: 'short' }),
+            revenue: Math.round((r._sum.amount ?? 0) / 100), // cents → dollars
+          }));
+      }),
+    );
+
+    // ── reports generated chart (last 14 days) ──────────────
+    const reportsChart = await Promise.all(
+      Array.from({ length: 14 }, (_, i) => {
+        const date = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() - (13 - i),
+        );
+        const start = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate(),
+        );
+        const end = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate() + 1,
+        );
+        return this.prisma.report
+          .count({ where: { createdAt: { gte: start, lt: end } } })
+          .then((count) => ({
+            date: date.toLocaleDateString('default', {
+              month: 'short',
+              day: 'numeric',
+            }),
+            count,
+          }));
+      }),
+    );
+
+    // ── user statistics chart (registered vs guest, 6 months) ──
+    const userStatsChart = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        const start = new Date(date.getFullYear(), date.getMonth(), 1);
+        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+        return Promise.all([
+          this.prisma.user.count({
+            where: { isGuest: false, createdAt: { gte: start, lt: end } },
+          }),
+          this.prisma.user.count({
+            where: { isGuest: true, createdAt: { gte: start, lt: end } },
+          }),
+        ]).then(([registered, guests]) => ({
+          month: date.toLocaleString('default', { month: 'short' }),
+          registered,
+          guests,
+        }));
+      }),
+    );
+
+    // ── revenue breakdown chart (monthly vs yearly, 12 months) ──
+    const revenueBreakdownChart = await Promise.all(
+      Array.from({ length: 12 }, (_, i) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+        const start = new Date(date.getFullYear(), date.getMonth(), 1);
+        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+        return Promise.all([
+          this.prisma.payment.aggregate({
+            where: {
+              status: 'succeeded',
+              billingCycle: 'monthly',
+              createdAt: { gte: start, lt: end },
+            },
+            _sum: { amount: true },
+          }),
+          this.prisma.payment.aggregate({
+            where: {
+              status: 'succeeded',
+              billingCycle: 'yearly',
+              createdAt: { gte: start, lt: end },
+            },
+            _sum: { amount: true },
+          }),
+        ]).then(([monthly, yearly]) => ({
+          month: date.toLocaleString('default', { month: 'short' }),
+          monthly: Math.round((monthly._sum.amount ?? 0) / 100),
+          yearly: Math.round((yearly._sum.amount ?? 0) / 100),
+        }));
+      }),
+    );
+
+    // ── computed values ──────────────────────────────────────
+    const userGrowth =
+      usersLastMonth > 0
+        ? Math.round(((usersThisMonth - usersLastMonth) / usersLastMonth) * 100)
+        : 0;
+
+    const subscriptionGrowth =
+      subscriptionsLastMonth > 0
+        ? Math.round(
+            ((subscriptionsThisMonth - subscriptionsLastMonth) /
+              subscriptionsLastMonth) *
+              100,
+          )
+        : 0;
+
+    const reportGrowth =
+      reportsYesterday > 0
+        ? Math.round(
+            ((reportsToday - reportsYesterday) / reportsYesterday) * 100,
+          )
+        : 0;
+
+    const totalMonthlyRevenue = Math.round(
+      (monthlyRevenue._sum.amount ?? 0) / 100,
+    );
+    const totalYearlyRevenue = Math.round(
+      (yearlyRevenue._sum.amount ?? 0) / 100,
+    );
+    const totalRevenue = totalMonthlyRevenue + totalYearlyRevenue;
+    const totalPaidUsers = monthlyPlanCount + yearlyPlanCount;
+
+    return {
+      message: 'Dashboard analytics fetched successfully',
+      data: {
+        cards: {
+          totalUsers: {
+            count: totalUsers,
+            growth: userGrowth, // % vs last month
+          },
+          activeSubscriptions: {
+            count: activeSubscriptions,
+            growth: subscriptionGrowth, // % vs last month
+          },
+          guestUsers: {
+            count: guestUsers,
+            percentOfTotal:
+              totalUsers > 0 ? Math.round((guestUsers / totalUsers) * 100) : 0,
+          },
+          reportsToday: {
+            count: reportsToday,
+            growth: reportGrowth, // % vs yesterday
+          },
+        },
+        subscriptionPlans: {
+          monthly: {
+            count: monthlyPlanCount,
+            percent:
+              totalPaidUsers > 0
+                ? Math.round((monthlyPlanCount / totalPaidUsers) * 100)
+                : 0,
+          },
+          yearly: {
+            count: yearlyPlanCount,
+            percent:
+              totalPaidUsers > 0
+                ? Math.round((yearlyPlanCount / totalPaidUsers) * 100)
+                : 0,
+          },
+        },
+        revenueBreakdown: {
+          totalRevenue,
+          monthlyBilling: totalMonthlyRevenue,
+          yearlyBilling: totalYearlyRevenue,
+          monthlyPercent:
+            totalRevenue > 0
+              ? Math.round((totalMonthlyRevenue / totalRevenue) * 100)
+              : 0,
+          yearlyPercent:
+            totalRevenue > 0
+              ? Math.round((totalYearlyRevenue / totalRevenue) * 100)
+              : 0,
+        },
+        charts: {
+          revenueChart,
+          reportsChart,
+          userStatsChart,
+          revenueBreakdownChart,
+        },
+      },
+    };
+  }
 }
