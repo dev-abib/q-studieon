@@ -242,115 +242,223 @@ export class AdminService {
 
   async getDashboardAnalytics() {
     const now = new Date();
+
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
     const startOfToday = new Date(
       now.getFullYear(),
       now.getMonth(),
       now.getDate(),
     );
+
     const startOfYesterday = new Date(
       now.getFullYear(),
       now.getMonth(),
       now.getDate() - 1,
     );
 
+    // ─────────────────────────────────────────────
+    // helper
+    // ─────────────────────────────────────────────
+    const calculateGrowth = (current: number, previous: number): number => {
+      // no previous data
+      if (previous === 0) {
+        // no current data either
+        if (current === 0) return 0;
+
+        // brand new growth
+        return 100;
+      }
+
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
     const [
-      // ── stat cards ──────────────────────────────────────────
+      // ── stat cards ──────────────────────────
       totalUsers,
       usersThisMonth,
       usersLastMonth,
+
       activeSubscriptions,
       subscriptionsThisMonth,
       subscriptionsLastMonth,
+
       guestUsers,
+
       reportsToday,
       reportsYesterday,
 
-      // ── subscription plans breakdown ────────────────────────
+      // ── subscription plans ──────────────────
       monthlyPlanCount,
       yearlyPlanCount,
 
-      // ── revenue breakdown summary ───────────────────────────
+      // ── revenue summary ─────────────────────
       monthlyRevenue,
       yearlyRevenue,
     ] = await Promise.all([
-      // stat cards
+      // total users
       this.prisma.user.count(),
-      this.prisma.user.count({
-        where: { createdAt: { gte: startOfThisMonth } },
-      }),
-      this.prisma.user.count({
-        where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
-      }),
 
-      this.prisma.user.count({
-        where: { status: { in: ['active', 'trialing'] } },
-      }),
+      // users this month
       this.prisma.user.count({
         where: {
-          status: { in: ['active', 'trialing'] },
-          createdAt: { gte: startOfThisMonth },
-        },
-      }),
-      this.prisma.user.count({
-        where: {
-          status: { in: ['active', 'trialing'] },
-          createdAt: { gte: startOfLastMonth, lt: startOfThisMonth },
+          createdAt: {
+            gte: startOfThisMonth,
+          },
         },
       }),
 
-      this.prisma.user.count({ where: { isGuest: true } }),
+      // users last month
+      this.prisma.user.count({
+        where: {
+          createdAt: {
+            gte: startOfLastMonth,
+            lt: startOfThisMonth,
+          },
+        },
+      }),
 
-      this.prisma.report.count({ where: { createdAt: { gte: startOfToday } } }),
+      // active subscriptions
+      this.prisma.user.count({
+        where: {
+          status: {
+            in: ['active', 'trialing'],
+          },
+        },
+      }),
+
+      // subscriptions this month
+      this.prisma.user.count({
+        where: {
+          status: {
+            in: ['active', 'trialing'],
+          },
+          createdAt: {
+            gte: startOfThisMonth,
+          },
+        },
+      }),
+
+      // subscriptions last month
+      this.prisma.user.count({
+        where: {
+          status: {
+            in: ['active', 'trialing'],
+          },
+          createdAt: {
+            gte: startOfLastMonth,
+            lt: startOfThisMonth,
+          },
+        },
+      }),
+
+      // guest users
+      this.prisma.user.count({
+        where: {
+          isGuest: true,
+        },
+      }),
+
+      // reports today
       this.prisma.report.count({
-        where: { createdAt: { gte: startOfYesterday, lt: startOfToday } },
+        where: {
+          createdAt: {
+            gte: startOfToday,
+          },
+        },
       }),
 
-      // plan breakdown
+      // reports yesterday
+      this.prisma.report.count({
+        where: {
+          createdAt: {
+            gte: startOfYesterday,
+            lt: startOfToday,
+          },
+        },
+      }),
+
+      // monthly plan users
       this.prisma.user.count({
         where: {
           billingCycle: 'monthly',
-          status: { in: ['active', 'trialing'] },
+          status: {
+            in: ['active', 'trialing'],
+          },
         },
       }),
+
+      // yearly plan users
       this.prisma.user.count({
         where: {
           billingCycle: 'yearly',
-          status: { in: ['active', 'trialing'] },
+          status: {
+            in: ['active', 'trialing'],
+          },
         },
       }),
 
-      // revenue
+      // monthly revenue
       this.prisma.payment.aggregate({
-        where: { status: 'succeeded', billingCycle: 'monthly' },
-        _sum: { amount: true },
+        where: {
+          status: 'succeeded',
+          billingCycle: 'monthly',
+        },
+        _sum: {
+          amount: true,
+        },
       }),
+
+      // yearly revenue
       this.prisma.payment.aggregate({
-        where: { status: 'succeeded', billingCycle: 'yearly' },
-        _sum: { amount: true },
+        where: {
+          status: 'succeeded',
+          billingCycle: 'yearly',
+        },
+        _sum: {
+          amount: true,
+        },
       }),
     ]);
 
-    // ── monthly revenue chart (last 6 months) ───────────────
+    // ─────────────────────────────────────────────
+    // revenue chart (last 6 months)
+    // ─────────────────────────────────────────────
     const revenueChart = await Promise.all(
       Array.from({ length: 6 }, (_, i) => {
         const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+
         const start = new Date(date.getFullYear(), date.getMonth(), 1);
+
         const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
         return this.prisma.payment
           .aggregate({
-            where: { status: 'succeeded', createdAt: { gte: start, lt: end } },
-            _sum: { amount: true },
+            where: {
+              status: 'succeeded',
+              createdAt: {
+                gte: start,
+                lt: end,
+              },
+            },
+            _sum: {
+              amount: true,
+            },
           })
-          .then((r) => ({
-            month: date.toLocaleString('default', { month: 'short' }),
-            revenue: Math.round((r._sum.amount ?? 0) / 100), // cents → dollars
+          .then((result) => ({
+            month: date.toLocaleString('default', {
+              month: 'short',
+            }),
+            revenue: Math.round((result._sum.amount ?? 0) / 100),
           }));
       }),
     );
 
-    // ── reports generated chart (last 14 days) ──────────────
+    // ─────────────────────────────────────────────
+    // reports chart (last 14 days)
+    // ─────────────────────────────────────────────
     const reportsChart = await Promise.all(
       Array.from({ length: 14 }, (_, i) => {
         const date = new Date(
@@ -358,18 +466,28 @@ export class AdminService {
           now.getMonth(),
           now.getDate() - (13 - i),
         );
+
         const start = new Date(
           date.getFullYear(),
           date.getMonth(),
           date.getDate(),
         );
+
         const end = new Date(
           date.getFullYear(),
           date.getMonth(),
           date.getDate() + 1,
         );
+
         return this.prisma.report
-          .count({ where: { createdAt: { gte: start, lt: end } } })
+          .count({
+            where: {
+              createdAt: {
+                gte: start,
+                lt: end,
+              },
+            },
+          })
           .then((count) => ({
             date: date.toLocaleDateString('default', {
               month: 'short',
@@ -380,140 +498,190 @@ export class AdminService {
       }),
     );
 
-    // ── user statistics chart (registered vs guest, 6 months) ──
+    // ─────────────────────────────────────────────
+    // user stats chart
+    // ─────────────────────────────────────────────
     const userStatsChart = await Promise.all(
       Array.from({ length: 6 }, (_, i) => {
         const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+
         const start = new Date(date.getFullYear(), date.getMonth(), 1);
+
         const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
         return Promise.all([
           this.prisma.user.count({
-            where: { isGuest: false, createdAt: { gte: start, lt: end } },
+            where: {
+              isGuest: false,
+              createdAt: {
+                gte: start,
+                lt: end,
+              },
+            },
           }),
+
           this.prisma.user.count({
-            where: { isGuest: true, createdAt: { gte: start, lt: end } },
+            where: {
+              isGuest: true,
+              createdAt: {
+                gte: start,
+                lt: end,
+              },
+            },
           }),
         ]).then(([registered, guests]) => ({
-          month: date.toLocaleString('default', { month: 'short' }),
+          month: date.toLocaleString('default', {
+            month: 'short',
+          }),
           registered,
           guests,
         }));
       }),
     );
 
-    // ── revenue breakdown chart (monthly vs yearly, 12 months) ──
+    // ─────────────────────────────────────────────
+    // revenue breakdown chart (12 months)
+    // ─────────────────────────────────────────────
     const revenueBreakdownChart = await Promise.all(
       Array.from({ length: 12 }, (_, i) => {
         const date = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+
         const start = new Date(date.getFullYear(), date.getMonth(), 1);
+
         const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
         return Promise.all([
           this.prisma.payment.aggregate({
             where: {
               status: 'succeeded',
               billingCycle: 'monthly',
-              createdAt: { gte: start, lt: end },
+              createdAt: {
+                gte: start,
+                lt: end,
+              },
             },
-            _sum: { amount: true },
+            _sum: {
+              amount: true,
+            },
           }),
+
           this.prisma.payment.aggregate({
             where: {
               status: 'succeeded',
               billingCycle: 'yearly',
-              createdAt: { gte: start, lt: end },
+              createdAt: {
+                gte: start,
+                lt: end,
+              },
             },
-            _sum: { amount: true },
+            _sum: {
+              amount: true,
+            },
           }),
         ]).then(([monthly, yearly]) => ({
-          month: date.toLocaleString('default', { month: 'short' }),
+          month: date.toLocaleString('default', {
+            month: 'short',
+          }),
           monthly: Math.round((monthly._sum.amount ?? 0) / 100),
           yearly: Math.round((yearly._sum.amount ?? 0) / 100),
         }));
       }),
     );
 
-    // ── computed values ──────────────────────────────────────
-    const userGrowth =
-      usersLastMonth > 0
-        ? Math.round(((usersThisMonth - usersLastMonth) / usersLastMonth) * 100)
-        : 0;
+    // ─────────────────────────────────────────────
+    // growth calculations
+    // ─────────────────────────────────────────────
+    const userGrowth = calculateGrowth(usersThisMonth, usersLastMonth);
 
-    const subscriptionGrowth =
-      subscriptionsLastMonth > 0
-        ? Math.round(
-            ((subscriptionsThisMonth - subscriptionsLastMonth) /
-              subscriptionsLastMonth) *
-              100,
-          )
-        : 0;
+    const subscriptionGrowth = calculateGrowth(
+      subscriptionsThisMonth,
+      subscriptionsLastMonth,
+    );
 
-    const reportGrowth =
-      reportsYesterday > 0
-        ? Math.round(
-            ((reportsToday - reportsYesterday) / reportsYesterday) * 100,
-          )
-        : 0;
+    const reportGrowth = calculateGrowth(reportsToday, reportsYesterday);
 
+    // ─────────────────────────────────────────────
+    // revenue totals
+    // ─────────────────────────────────────────────
     const totalMonthlyRevenue = Math.round(
       (monthlyRevenue._sum.amount ?? 0) / 100,
     );
+
     const totalYearlyRevenue = Math.round(
       (yearlyRevenue._sum.amount ?? 0) / 100,
     );
+
     const totalRevenue = totalMonthlyRevenue + totalYearlyRevenue;
+
     const totalPaidUsers = monthlyPlanCount + yearlyPlanCount;
 
     return {
+      success: true,
       message: 'Dashboard analytics fetched successfully',
+
       data: {
         cards: {
           totalUsers: {
             count: totalUsers,
-            growth: userGrowth, // % vs last month
+            growth: userGrowth,
           },
+
           activeSubscriptions: {
             count: activeSubscriptions,
-            growth: subscriptionGrowth, // % vs last month
+            growth: subscriptionGrowth,
           },
+
           guestUsers: {
             count: guestUsers,
+
             percentOfTotal:
               totalUsers > 0 ? Math.round((guestUsers / totalUsers) * 100) : 0,
           },
+
           reportsToday: {
             count: reportsToday,
-            growth: reportGrowth, // % vs yesterday
+            growth: reportGrowth,
           },
         },
+
         subscriptionPlans: {
           monthly: {
             count: monthlyPlanCount,
+
             percent:
               totalPaidUsers > 0
                 ? Math.round((monthlyPlanCount / totalPaidUsers) * 100)
                 : 0,
           },
+
           yearly: {
             count: yearlyPlanCount,
+
             percent:
               totalPaidUsers > 0
                 ? Math.round((yearlyPlanCount / totalPaidUsers) * 100)
                 : 0,
           },
         },
+
         revenueBreakdown: {
           totalRevenue,
+
           monthlyBilling: totalMonthlyRevenue,
+
           yearlyBilling: totalYearlyRevenue,
+
           monthlyPercent:
             totalRevenue > 0
               ? Math.round((totalMonthlyRevenue / totalRevenue) * 100)
               : 0,
+
           yearlyPercent:
             totalRevenue > 0
               ? Math.round((totalYearlyRevenue / totalRevenue) * 100)
               : 0,
         },
+
         charts: {
           revenueChart,
           reportsChart,
@@ -523,4 +691,5 @@ export class AdminService {
       },
     };
   }
+  
 }
