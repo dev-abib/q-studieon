@@ -22,7 +22,7 @@ export class SubscriptionService {
     });
   }
 
-  // get price id helper
+  // ── helper: get price id ──────────────────────────────────────────────────
   private getPriceId(plan: PlanType | bilingCycle): string {
     const priceId =
       plan === 'monthly'
@@ -33,7 +33,7 @@ export class SubscriptionService {
     return priceId;
   }
 
-  // get or create stripe customer helper
+  // ── helper: get or create stripe customer ─────────────────────────────────
   private async getOrCreateStripeCustomer(userId: string): Promise<string> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -53,7 +53,26 @@ export class SubscriptionService {
     return customer.id;
   }
 
-  // checkout session service
+  // ── helper: derive billing cycle from a retrieved Stripe subscription ─────
+  private getBillingCycleFromSub(rawSub: Record<string, unknown>): bilingCycle {
+    const items = Array.isArray(
+      (rawSub.items as Record<string, unknown> | undefined)?.data,
+    )
+      ? ((rawSub.items as Record<string, unknown>).data as unknown[])
+      : [];
+    const firstItem =
+      typeof items[0] === 'object' && items[0] !== null
+        ? (items[0] as Record<string, unknown>)
+        : null;
+    const interval =
+      typeof (firstItem?.plan as Record<string, unknown> | undefined)
+        ?.interval === 'string'
+        ? ((firstItem!.plan as Record<string, unknown>).interval as string)
+        : undefined;
+    return interval === 'year' ? 'yearly' : 'monthly';
+  }
+
+  // ── checkout session ──────────────────────────────────────────────────────
   async crateCheckoutSession(
     userId: string,
     body: SubscriptionDto,
@@ -92,7 +111,7 @@ export class SubscriptionService {
     };
   }
 
-  // cancel subscription service
+  // ── cancel subscription ───────────────────────────────────────────────────
   async cancelSubscription(userId: string): Promise<{ message: string }> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -147,7 +166,7 @@ export class SubscriptionService {
     };
   }
 
-  // reactivate subscription service
+  // ── reactivate subscription ───────────────────────────────────────────────
   async reactivateSubscription(userId: string): Promise<{ message: string }> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -185,6 +204,7 @@ export class SubscriptionService {
     };
   }
 
+  // ── webhook router ────────────────────────────────────────────────────────
   async handleWebHook(rawBody: Buffer, signature: string): Promise<void> {
     let event: unknown;
     try {
@@ -289,14 +309,24 @@ export class SubscriptionService {
       where: { stripeCustomerId: customerId },
     });
 
+    // FIX: never downgrade an already-active/trialing user to incomplete.
+    // Stripe can fire customer.subscription.updated with status=incomplete
+    // after invoice.payment_succeeded has already set the user to active,
+    // which would silently wipe out the active status and break the dashboard count.
+    const shouldUpdateStatus = !(
+      (existingUser?.status === 'active' ||
+        existingUser?.status === 'trialing') &&
+      resolvedStatus === 'incomplete'
+    );
+
     await this.prisma.user.updateMany({
       where: { stripeCustomerId: customerId },
       data: {
         stripeSubscriptionId: subscriptionId ?? undefined,
-        status: resolvedStatus,
         billingCycle: plan,
         isPaid: cancelAtPeriodEnd ? true : isPaid,
         currentPeriodEnd: currentPeriodEnd,
+        ...(shouldUpdateStatus && { status: resolvedStatus }),
       },
     });
 
@@ -320,7 +350,7 @@ export class SubscriptionService {
         data: {
           userId: existingUser.id,
           event: eventType,
-          status: resolvedStatus,
+          status: shouldUpdateStatus ? resolvedStatus : existingUser.status!,
           billingCycle: plan,
           previousStatus: existingUser.status ?? undefined,
           previousBillingCycle: existingUser.billingCycle ?? undefined,
@@ -363,25 +393,6 @@ export class SubscriptionService {
         },
       });
     }
-  }
-
-  // ── helper: derive billing cycle from a retrieved Stripe subscription ─────
-  private getBillingCycleFromSub(rawSub: Record<string, unknown>): bilingCycle {
-    const items = Array.isArray(
-      (rawSub.items as Record<string, unknown> | undefined)?.data,
-    )
-      ? ((rawSub.items as Record<string, unknown>).data as unknown[])
-      : [];
-    const firstItem =
-      typeof items[0] === 'object' && items[0] !== null
-        ? (items[0] as Record<string, unknown>)
-        : null;
-    const interval =
-      typeof (firstItem?.plan as Record<string, unknown> | undefined)
-        ?.interval === 'string'
-        ? ((firstItem!.plan as Record<string, unknown>).interval as string)
-        : undefined;
-    return interval === 'year' ? 'yearly' : 'monthly';
   }
 
   // ── Webhook: payment failed ───────────────────────────────────────────────
@@ -464,8 +475,8 @@ export class SubscriptionService {
         ? rawInvoice.billing_reason
         : undefined;
 
-    // subscription_create  = first payment on a new subscription
-    // subscription_cycle   = recurring renewal payment
+    // subscription_create = first payment on a new subscription
+    // subscription_cycle  = recurring renewal payment
     if (
       billingReason !== 'subscription_cycle' &&
       billingReason !== 'subscription_create'
