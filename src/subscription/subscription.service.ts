@@ -22,7 +22,6 @@ export class SubscriptionService {
     });
   }
 
-  // ── helper: get price id ──────────────────────────────────────────────────
   private getPriceId(plan: PlanType | bilingCycle): string {
     const priceId =
       plan === 'monthly'
@@ -33,7 +32,6 @@ export class SubscriptionService {
     return priceId;
   }
 
-  // ── helper: get or create stripe customer ─────────────────────────────────
   private async getOrCreateStripeCustomer(userId: string): Promise<string> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -53,7 +51,6 @@ export class SubscriptionService {
     return customer.id;
   }
 
-  // ── helper: derive billing cycle from a retrieved Stripe subscription ─────
   private getBillingCycleFromSub(rawSub: Record<string, unknown>): bilingCycle {
     const items = Array.isArray(
       (rawSub.items as Record<string, unknown> | undefined)?.data,
@@ -72,7 +69,6 @@ export class SubscriptionService {
     return interval === 'year' ? 'yearly' : 'monthly';
   }
 
-  // ── helper: find user by stripeCustomerId with fallback to subscriptionId ──
   private async findUserByStripeIds(
     customerId: string,
     subscriptionId?: string,
@@ -91,7 +87,6 @@ export class SubscriptionService {
     return null;
   }
 
-  // ── checkout session ──────────────────────────────────────────────────────
   async crateCheckoutSession(
     userId: string,
     body: SubscriptionDto,
@@ -130,7 +125,6 @@ export class SubscriptionService {
     };
   }
 
-  // ── cancel subscription ───────────────────────────────────────────────────
   async cancelSubscription(userId: string): Promise<{ message: string }> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -185,7 +179,6 @@ export class SubscriptionService {
     };
   }
 
-  // ── reactivate subscription ───────────────────────────────────────────────
   async reactivateSubscription(userId: string): Promise<{ message: string }> {
     const user = await this.userRepo.findUser('id', userId);
 
@@ -223,7 +216,6 @@ export class SubscriptionService {
     };
   }
 
-  // ── webhook router ────────────────────────────────────────────────────────
   async handleWebHook(rawBody: Buffer, signature: string): Promise<void> {
     let event: unknown;
     try {
@@ -246,7 +238,7 @@ export class SubscriptionService {
         ? (event as { data: { object?: unknown } }).data.object
         : undefined;
 
-    if (!eventType) return;
+    if (!eventType || !payload) return;
 
     switch (eventType) {
       case 'customer.subscription.created':
@@ -271,31 +263,15 @@ export class SubscriptionService {
     }
   }
 
-  // ── Webhook: subscription created or updated ──────────────────────────────
   private async onSubscriptionUpsert(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
-
     const rawSub = stripeSub as Record<string, unknown>;
 
     const customerId =
       typeof rawSub.customer === 'string' ? rawSub.customer : undefined;
     if (!customerId) return;
 
-    const items = Array.isArray(
-      (rawSub.items as Record<string, unknown> | undefined)?.data,
-    )
-      ? ((rawSub.items as Record<string, unknown>).data as unknown[])
-      : [];
-    const firstItem =
-      typeof items[0] === 'object' && items[0] !== null
-        ? (items[0] as Record<string, unknown>)
-        : null;
-    const interval =
-      typeof (firstItem?.plan as Record<string, unknown> | undefined)
-        ?.interval === 'string'
-        ? ((firstItem!.plan as Record<string, unknown>).interval as string)
-        : undefined;
-    const plan: bilingCycle = interval === 'year' ? 'yearly' : 'monthly';
+    const plan: bilingCycle = this.getBillingCycleFromSub(rawSub);
 
     const statusMap: Record<string, subscriptionStatus> = {
       active: 'active',
@@ -323,21 +299,17 @@ export class SubscriptionService {
         ? rawSub.current_period_end
         : null;
 
-    // fetch user with fallback to subscriptionId in case stripeCustomerId
-    // hasn't been saved yet when this webhook fires
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
     );
 
-    // never downgrade an already-active/trialing user to incomplete
     const shouldUpdateStatus = !(
       (existingUser?.status === 'active' ||
         existingUser?.status === 'trialing') &&
       resolvedStatus === 'incomplete'
     );
 
-    // update by customerId OR subscriptionId so the row is always found
     await this.prisma.user.updateMany({
       where: {
         OR: [
@@ -384,7 +356,6 @@ export class SubscriptionService {
     }
   }
 
-  // ── Webhook: subscription hard deleted ────────────────────────────────────
   private async onSubscriptionDeleted(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
     const rawSub = stripeSub as Record<string, unknown>;
@@ -430,7 +401,6 @@ export class SubscriptionService {
     }
   }
 
-  // ── Webhook: payment failed ───────────────────────────────────────────────
   private async onPaymentFailed(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
     const rawInvoice = invoice as Record<string, unknown>;
@@ -504,7 +474,6 @@ export class SubscriptionService {
     }
   }
 
-  // ── Webhook: payment succeeded ────────────────────────────────────────────
   private async onPaymentSucceeded(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
     const rawInvoice = invoice as Record<string, unknown>;
@@ -514,8 +483,6 @@ export class SubscriptionService {
         ? rawInvoice.billing_reason
         : undefined;
 
-    // subscription_create = first payment on a new subscription
-    // subscription_cycle  = recurring renewal payment
     if (
       billingReason !== 'subscription_cycle' &&
       billingReason !== 'subscription_create'
@@ -530,7 +497,6 @@ export class SubscriptionService {
       typeof rawInvoice.customer === 'string' ? rawInvoice.customer : undefined;
     if (!subscriptionId || !customerId) return;
 
-    // retrieve subscription once — used for both period end and billing cycle
     const rawSub = (await this.stripe.subscriptions.retrieve(
       subscriptionId,
     )) as unknown as Record<string, unknown>;
@@ -542,7 +508,6 @@ export class SubscriptionService {
 
     const billingCycle = this.getBillingCycleFromSub(rawSub);
 
-    // fallback to subscriptionId lookup in case stripeCustomerId not saved yet
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
