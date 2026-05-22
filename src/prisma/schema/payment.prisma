@@ -6,10 +6,9 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
+  id           String        @id @default(cuid())
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   amount       Int // in cents, e.g. 2999 = $29.99
   currency     String        @default("usd")
   status       PaymentStatus

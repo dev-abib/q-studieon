@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtPayload } from '../auth/types/jwt.types';
@@ -15,16 +17,24 @@ import { MulterFile } from '../common/pipes/file-validation.pipe';
 import { CloudinaryService } from '../common/services/cloudinary.service';
 import { EmailService } from '../infra/mail/mail.service';
 import { systemDeleteAccountTemplate } from '../infra/mail/templates/system/delete-account-system-confirmation.template';
+import Stripe from 'stripe';
+import { AdminMailDto } from 'src/auth/dto/admin.mail.dto';
+import { adminMessageTemplate } from 'src/infra/mail/templates/system/admin-message.template';
 
 @Injectable()
 export class AdminService {
+  private readonly stripe: InstanceType<typeof Stripe>;
   constructor(
     private readonly userRepo: UserRepository,
     private readonly prisma: PrismaService,
     private readonly auth: AuthHelper,
     private readonly cloudinary: CloudinaryService,
     private readonly email: EmailService,
-  ) {}
+  ) {
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+      apiVersion: '2026-04-22.dahlia',
+    });
+  }
 
   // get me admin service
   async getMeAdmin(user: JwtPayload) {
@@ -203,36 +213,68 @@ export class AdminService {
   ) {
     const admin = await this.userRepo.findUser('id', id);
 
+    if (!admin) {
+      throw new NotFoundException('User not found');
+    }
+
     if (isAdminDelete && session.role !== 'super_admin') {
       throw new UnauthorizedException(
-        `You don't have sufficient access to remove a admin`,
+        `You don't have sufficient access to remove an admin`,
       );
     }
 
-    if (admin.profilePicturePublicId) {
-      await this.cloudinary.deleteFile(admin.profilePicturePublicId);
+    // cancel stripe subscription first
+    if (admin.stripeSubscriptionId) {
+      try {
+        const subscription = await this.stripe.subscriptions.retrieve(
+          admin.stripeSubscriptionId,
+        );
+        if (
+          subscription.status !== 'canceled' &&
+          subscription.status !== 'incomplete_expired'
+        ) {
+          await this.stripe.subscriptions.cancel(admin.stripeSubscriptionId);
+        }
+      } catch (error) {
+        console.error('Stripe subscription cancel failed:', error);
+
+        throw new BadRequestException('Failed to cancel Stripe subscription');
+      }
     }
 
-    await this.prisma.user.delete({
-      where: { id: id },
+    // delete profile image
+    if (admin.profilePicturePublicId) {
+      try {
+        await this.cloudinary.deleteFile(admin.profilePicturePublicId);
+      } catch (error) {
+        console.error('Cloudinary delete failed:', error);
+      }
+    }
+
+    // transaction
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.delete({
+        where: { id },
+      });
     });
 
+    // email after deletion
     if (!isAdminDelete && !admin.isGuest) {
       await this.email.sendEmail({
         to: admin.email as string,
-        subject: `Account Suspension Notice — ${process.env.MAIL_FROM_NAME as string}`,
+        subject: `Account Suspension Notice — ${process.env.MAIL_FROM_NAME}`,
         html: systemDeleteAccountTemplate({
           name: admin.name as string,
           reason:
             'Repeated violation of our Terms of Service and Community Guidelines.',
           deletedBy: 'Site Administrator',
-          supportEmail: `${process.env.MAIL_FROM}`,
+          supportEmail: process.env.MAIL_FROM as string,
         }),
       });
     }
 
     return {
-      message: ` ${isAdminDelete ? 'Admin' : 'User'} deleted successfully`,
+      message: `${isAdminDelete ? 'Admin' : 'User'} deleted successfully`,
       data: {
         name: admin.name,
         email: admin.email,
@@ -500,6 +542,26 @@ export class AdminService {
           revenueBreakdownChart,
         },
       },
+    };
+  }
+
+  // send admin mail
+  async sendAdminMail(dto: AdminMailDto, admin: JwtPayload) {
+    const user = await this.userRepo.findUser('email', dto.email);
+
+    await this.email.sendEmail({
+      to: dto.email,
+      subject: `[Admin Message] ${dto.subject}`,
+      html: adminMessageTemplate({
+        userName: user.name as string,
+        adminName: admin.name,
+        message: dto.message,
+        subject: dto.subject,
+      }),
+    });
+
+    return {
+      message: `Successfully sent admin mail`,
     };
   }
 }

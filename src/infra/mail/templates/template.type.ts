@@ -49,3 +49,10 @@ export interface SystemDeleteAccountProps {
   deletedBy?: string;
   supportEmail: string;
 }
+
+export interface AdminMessageProps {
+  userName: string;
+  adminName: string;
+  subject: string;
+  message: string;
+}

@@ -10,9 +10,9 @@ enum SubscriptionEventType {
 }
 
 model SubscriptionEvent {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   event        SubscriptionEventType
   status       subscriptionStatus

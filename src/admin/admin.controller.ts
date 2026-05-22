@@ -26,6 +26,7 @@ import {
 } from '../common/pipes/file-validation.pipe';
 import { Public } from '../auth/decorators/public.decorator';
 import { UserService } from 'src/user/user.service';
+import { AdminMailDto } from 'src/auth/dto/admin.mail.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -116,5 +117,13 @@ export class AdminController {
   @HttpCode(200)
   getDashboardAnalytics() {
     return this.adminService.getDashboardAnalytics();
+  }
+
+  // send admin mail
+  @Post('admin-mail')
+  @HttpCode(200)
+  @Auth('admin')
+  sendAdminMail(@Body() dto: AdminMailDto, @CurrentUser() admin: JwtPayload) {
+    return this.adminService.sendAdminMail(dto, admin);
   }
 }
