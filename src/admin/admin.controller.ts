@@ -25,10 +25,14 @@ import {
   type MulterFile,
 } from '../common/pipes/file-validation.pipe';
 import { Public } from '../auth/decorators/public.decorator';
+import { UserService } from 'src/user/user.service';
 
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly user: UserService,
+  ) {}
 
   // get me admin controller
   @Get('get-me-admin')
@@ -81,6 +85,14 @@ export class AdminController {
   @HttpCode(200)
   getAllUsers(@Query() query: PaginationDto) {
     return this.adminService.getAllAdminsUsers(query, false);
+  }
+
+  // get user by id controller
+  @Get('user/:id')
+  @HttpCode(200)
+  @Auth('admin')
+  getUserById(@Param('id') id: string) {
+    return this.user.getMe(id);
   }
 
   @Delete('delete-admin/:id')

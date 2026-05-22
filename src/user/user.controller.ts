@@ -3,7 +3,6 @@ import {
   Get,
   Body,
   Patch,
-  Param,
   Delete,
   HttpCode,
   UseInterceptors,
@@ -33,15 +32,6 @@ export class UserController {
   @Auth('user')
   getMe(@CurrentUser() user: JwtPayload) {
     return this.user.getMe(user.id);
-  }
-
-  // get user by id controller
-  @Get('user/:id')
-  @HttpCode(200)
-  @Auth('user')
-  @NoGuest()
-  getUserById(@Param('id') id: string) {
-    return this.user.getMe(id);
   }
 
   // update user controller
