@@ -31,10 +31,6 @@ export interface AiReportInput {
 
   entranceBearing: number;
 
-  /**
-   * Optional: true when the user has explicitly confirmed the entrance direction
-   * from the UI (e.g. via a confirmation prompt). Defaults to false.
-   */
   userConfirmedDirection?: boolean;
 }
 
@@ -77,6 +73,7 @@ export interface BackendPayload {
 
   numerology_address_number?: number | string;
   numerology_full_address_number?: number | string;
+  numerology_theme?: string; // ✅ NEW: Power & Stability label
 
   street_view_available?: boolean;
   user_confirmed_direction?: boolean;
@@ -100,10 +97,7 @@ export interface BackendPayload {
   wealth_stability_flags?: string[];
   daily_life_flags?: string[];
 
-  /** FIX: new field required by UI "Family Flow" section */
   family_flow_summary?: string;
-
-  /** FIX: new field required by UI "Helpful Tips" section */
   helpful_tips?: string[];
 
   feng_shui_rule_summary?: string;
@@ -116,12 +110,17 @@ export interface BackendPayload {
 
 /**
  * Mirrors the exact JSON schema the AI is instructed to return.
- * Use this as the typed return of generateByAccessLevel so callers
- * don't have to work with `unknown`.
  */
 export interface AiReportOutput {
   overall_alignment_summary: string;
   overview: string;
+
+  // ✅ NEW: entrance direction with degrees + cardinal for the UI header
+  entrance_direction: {
+    degrees: number;
+    cardinal: string;
+    label: string; // e.g. "275° W"
+  };
 
   entrance_energy: {
     narrative: string;
@@ -133,6 +132,7 @@ export interface AiReportOutput {
   numerology: {
     address_number: number;
     full_address_number: number;
+    theme: string; // ✅ NEW: e.g. "Power & Stability"
     tags: string[];
     narrative: string;
   };
@@ -182,7 +182,6 @@ export interface AiReportOutput {
 
 // ---------------------------------------------------------------------------
 // Direction-aware flag tables
-// Each cardinal maps to flags that vary meaningfully by direction.
 // ---------------------------------------------------------------------------
 
 interface LifeAreaFlags {
@@ -333,6 +332,24 @@ const DIRECTION_FLAGS: Record<string, LifeAreaFlags> = {
 };
 
 // ---------------------------------------------------------------------------
+// Numerology theme map — maps reduced number → UI label
+// ---------------------------------------------------------------------------
+const NUMEROLOGY_THEMES: Record<number, string> = {
+  1: 'Leadership & Independence',
+  2: 'Balance & Partnership',
+  3: 'Creativity & Expression',
+  4: 'Power & Stability',
+  5: 'Change & Movement',
+  6: 'Family & Responsibility',
+  7: 'Reflection & Analysis',
+  8: 'Authority & Abundance',
+  9: 'Completion & Wisdom',
+  11: 'Intuition & Vision',
+  22: 'Master Builder',
+  33: 'Compassionate Leadership',
+};
+
+// ---------------------------------------------------------------------------
 
 @Injectable()
 export class AiHelper {
@@ -359,16 +376,22 @@ Every field is required. Do not add or remove keys.
 {
   "overall_alignment_summary": string,
     // 1–2 sentence plain-English summary of the home's overall energy alignment.
-    // Reference the auspiciousness_level and overall_score from the payload.
-    // Example: "This home shows strongly supportive energy patterns with a few areas worth mindful attention."
 
   "overview": string,
-    // 4–6 sentence narrative combining entrance direction, feng shui, vastu, and numerology into a cohesive reading.
-    // Warm, grounded, non-alarmist tone. Reference the address and cardinal direction naturally.
+    // 4–6 sentence narrative combining entrance direction, feng shui, vastu, and numerology.
+
+  "entrance_direction": {
+    "degrees": number,
+      // copy entrance_bearing_degrees from payload exactly
+    "cardinal": string,
+      // copy entrance_cardinal from payload exactly
+    "label": string
+      // format as "{degrees}° {cardinal}" e.g. "275° W"
+  },
 
   "entrance_energy": {
     "narrative": string,
-      // 2–3 sentences describing what the entrance direction means for daily energy flow entering the home.
+      // 2–3 sentences describing what the entrance direction means for daily energy flow.
     "tags": string[],
       // copy feng_shui_tags from payload
     "confidence_level": string,
@@ -382,6 +405,8 @@ Every field is required. Do not add or remove keys.
       // copy numerology_address_number from payload
     "full_address_number": number,
       // copy numerology_full_address_number from payload
+    "theme": string,
+      // copy numerology_theme from payload verbatim
     "tags": string[],
       // copy numerology_tags from payload
     "narrative": string
@@ -390,85 +415,45 @@ Every field is required. Do not add or remove keys.
 
   "feng_shui": {
     "tags": string[],
-      // copy feng_shui_tags from payload
     "narrative": string,
-      // 2–3 sentences expanding on feng_shui_rule_summary. Reference the cardinal direction and element.
     "rule_summary": string
-      // copy feng_shui_rule_summary from payload verbatim
   },
 
   "vastu": {
     "tags": string[],
-      // copy vastu_tags from payload
     "narrative": string,
-      // 2–3 sentences expanding on vastu_rule_summary. Reference the direction and any remediation needed.
     "rule_summary": string
-      // copy vastu_rule_summary from payload verbatim
   },
 
   "indicators": {
     "supportive": string[],
-      // copy supportive_indicators from payload
     "red_flags": string[]
-      // copy red_flag_indicators from payload
   },
 
   "practical_remedies": string[],
-    // copy practical_remedies from payload
 
   "life_aspects": {
-    "relationships": {
-      "flags": string[],
-        // copy relationship_flags from payload
-      "narrative": string
-        // 1–2 sentences expanding on those flags in context of this home's direction and energy
-    },
-    "career": {
-      "flags": string[],
-        // copy career_flags from payload
-      "narrative": string
-    },
-    "family": {
-      "flags": string[],
-        // copy family_flags from payload
-      "narrative": string
-    },
-    "romance_and_partnership": {
-      "flags": string[],
-        // copy romance_partner_flags from payload
-      "narrative": string
-    },
-    "wealth_and_stability": {
-      "flags": string[],
-        // copy wealth_stability_flags from payload
-      "narrative": string
-    },
-    "daily_life": {
-      "flags": string[],
-        // copy daily_life_flags from payload
-      "narrative": string
-    }
+    "relationships": { "flags": string[], "narrative": string },
+    "career": { "flags": string[], "narrative": string },
+    "family": { "flags": string[], "narrative": string },
+    "romance_and_partnership": { "flags": string[], "narrative": string },
+    "wealth_and_stability": { "flags": string[], "narrative": string },
+    "daily_life": { "flags": string[], "narrative": string }
   },
 
   "family_flow": {
     "summary": string,
-      // copy family_flow_summary from payload verbatim
     "narrative": string
-      // 1–2 additional sentences with a practical suggestion for the household
   },
 
   "helpful_tips": string[],
-    // copy helpful_tips array from payload verbatim
 
   "auspiciousness": {
     "level": string,
-      // copy auspiciousness_level from payload
     "summary": string
-      // 1–2 sentences explaining what this auspiciousness level means in practical terms for the resident
   },
 
   "overall_score": number
-    // copy overall_score from payload exactly
 }
 `;
 
@@ -488,7 +473,6 @@ Every field is required. Do not add or remove keys.
         ? 'Entrance direction confirmed by user.'
         : 'Entrance direction estimated from map imagery.',
       street_view_available: true,
-      // FIX: honour the userConfirmedDirection flag instead of hardcoding false
       user_confirmed_direction: userConfirmed,
     };
   }
@@ -516,7 +500,6 @@ Every field is required. Do not add or remove keys.
   }
 
   analyzeFengShui(cardinal: string): FengShuiAnalysis {
-    // FIX: all four cardinal directions now have explicit, meaningful branches
     switch (cardinal) {
       case 'N':
         return {
@@ -610,7 +593,6 @@ Every field is required. Do not add or remove keys.
   }
 
   analyzeVastu(cardinal: string): VastuAnalysis {
-    // FIX: previously always returned the same generic response regardless of direction
     switch (cardinal) {
       case 'N':
         return {
@@ -665,19 +647,15 @@ Every field is required. Do not add or remove keys.
     redFlags: string[],
     numerologyChallenges: string[],
   ): AlignmentAnalysis {
-    // --- 1. Normalize inputs (avoid overcounting explosions)
     const supportiveScore = supportive.length;
     const redFlagScore = redFlags.length;
     const challengeScore = numerologyChallenges.length;
 
     const rawScore =
       62 + supportiveScore * 3.5 - redFlagScore * 5 - challengeScore * 3.5;
-    // --- 3. Soft clamp to avoid everyone hitting ceiling/floor
     const normalized = Math.round(Math.max(35, Math.min(95, rawScore)));
 
-    // --- 4. Human-readable bands (more realistic distribution)
     let auspiciousness_level: string;
-
     if (normalized >= 85) {
       auspiciousness_level = 'highly supportive';
     } else if (normalized >= 70) {
@@ -688,10 +666,7 @@ Every field is required. Do not add or remove keys.
       auspiciousness_level = 'needs attention';
     }
 
-    return {
-      overall_score: normalized,
-      auspiciousness_level,
-    };
+    return { overall_score: normalized, auspiciousness_level };
   }
 
   private buildNumerologyRuleSummary(
@@ -699,7 +674,6 @@ Every field is required. Do not add or remove keys.
     fullAddressReduced: number,
     tags: string[],
   ): string {
-    // FIX: was a hardcoded string; now reflects actual computed numbers
     const tagPhrase =
       tags.length > 0 ? tags.slice(0, 3).join(', ') : 'balanced';
     return (
@@ -722,7 +696,6 @@ Every field is required. Do not add or remove keys.
     const fengShui = this.analyzeFengShui(direction.entrance_cardinal);
     const vastu = this.analyzeVastu(direction.entrance_cardinal);
 
-    // FIX: pass numerology challenge indicators into alignment scoring
     const alignment = this.calculateAlignment(
       [
         ...fengShui.supportive_indicators,
@@ -735,16 +708,19 @@ Every field is required. Do not add or remove keys.
       input.numerologyDetails.numerologySummary.challengeIndicators,
     );
 
-    // FIX: direction-aware life-area flags instead of hardcoded strings
     const directionFlags =
       DIRECTION_FLAGS[direction.entrance_cardinal] ?? DIRECTION_FLAGS['E'];
 
-    // FIX: dynamic numerology rule summary
     const numerologyRuleSummary = this.buildNumerologyRuleSummary(
       input.numerologyDetails.addressNumber.reduced,
       input.numerologyDetails.fullAddress.reduced,
       input.numerologyDetails.numerologySummary.primaryEnergy,
     );
+
+    // ✅ Resolve numerology theme from the address number
+    const numerologyTheme =
+      NUMEROLOGY_THEMES[input.numerologyDetails.addressNumber.reduced] ??
+      'Balanced Energy';
 
     return {
       selected_lens: 'combined',
@@ -756,6 +732,7 @@ Every field is required. Do not add or remove keys.
       numerology_address_number: input.numerologyDetails.addressNumber.reduced,
       numerology_full_address_number:
         input.numerologyDetails.fullAddress.reduced,
+      numerology_theme: numerologyTheme, // ✅ NEW
 
       numerology_tags: input.numerologyDetails.numerologySummary.primaryEnergy,
 
@@ -772,7 +749,6 @@ Every field is required. Do not add or remove keys.
       ],
       practical_remedies: fengShui.practical_remedies,
 
-      // FIX: direction-aware life-area flags
       relationship_flags: directionFlags.relationship,
       career_flags: directionFlags.career,
       family_flags: directionFlags.family,
@@ -780,7 +756,6 @@ Every field is required. Do not add or remove keys.
       wealth_stability_flags: directionFlags.wealth_stability,
       daily_life_flags: directionFlags.daily_life,
 
-      // FIX: new fields required by UI sections
       family_flow_summary: directionFlags.family_flow_summary,
       helpful_tips: directionFlags.helpful_tips,
 

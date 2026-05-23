@@ -1,4 +1,3 @@
-// src/infra/emails/email.service.ts
 import {
   Injectable,
   InternalServerErrorException,
