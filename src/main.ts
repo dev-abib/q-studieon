@@ -20,9 +20,10 @@ async function bootstrap() {
       'http://localhost:3001',
       'https://admin.dwellr.tech',
     ],
-
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   app.set('trust proxy', 1);
