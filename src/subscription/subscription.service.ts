@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { bilingCycle, subscriptionStatus } from '@prisma/client';
 import { UserRepository } from '../common/repositories/user.repository';
@@ -12,6 +13,7 @@ import { SubscriptionDto, PlanType } from './dto/subscreption.dto';
 @Injectable()
 export class SubscriptionService {
   private readonly stripe: InstanceType<typeof Stripe>;
+  private readonly logger = new Logger(SubscriptionService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -215,13 +217,18 @@ export class SubscriptionService {
 
   async handleWebHook(rawBody: Buffer, signature: string): Promise<void> {
     let event: unknown;
+
     try {
       event = this.stripe.webhooks.constructEvent(
         rawBody,
         signature,
         process.env.STRIPE_WEBHOOK_SECRET as string,
       );
-    } catch {
+      this.logger.log(
+        `✅ Webhook received: ${(event as { type: string }).type}`,
+      );
+    } catch (err) {
+      this.logger.error(`❌ Webhook signature failed: ${err}`);
       throw new BadRequestException('Invalid Stripe webhook signature');
     }
 
@@ -260,6 +267,7 @@ export class SubscriptionService {
         break;
 
       default:
+        this.logger.log(`⚠️ Unhandled webhook event: ${eventType}`);
         break;
     }
   }
@@ -271,13 +279,27 @@ export class SubscriptionService {
     const subscriptionId = rawSession.subscription as string;
     const customerId = rawSession.customer as string;
 
-    if (!subscriptionId || !customerId) return;
+    this.logger.log(
+      `🔔 Checkout completed - customerId: ${customerId}, subscriptionId: ${subscriptionId}`,
+    );
+
+    if (!subscriptionId || !customerId) {
+      this.logger.warn(
+        '⚠️ Missing subscriptionId or customerId in checkout session',
+      );
+      return;
+    }
 
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
     );
-    if (!existingUser) return;
+    this.logger.log(`👤 Found user: ${existingUser?.id ?? 'NOT FOUND'}`);
+
+    if (!existingUser) {
+      this.logger.error(`❌ No user found for customerId: ${customerId}`);
+      return;
+    }
 
     const rawSub = (await this.stripe.subscriptions.retrieve(
       subscriptionId,
@@ -309,10 +331,15 @@ export class SubscriptionService {
         data: {
           status: 'active',
           isPaid: true,
+          stripeSubscriptionId: subscriptionId,
           currentPeriodEnd,
         },
       }),
     ]);
+
+    this.logger.log(
+      `✅ Payment and user updated for userId: ${existingUser.id}`,
+    );
   }
 
   private async onSubscriptionUpsert(stripeSub: unknown) {
@@ -322,6 +349,8 @@ export class SubscriptionService {
     const customerId =
       typeof rawSub.customer === 'string' ? rawSub.customer : undefined;
     if (!customerId) return;
+
+    this.logger.log(`🔄 Subscription upsert - customerId: ${customerId}`);
 
     const plan: bilingCycle = this.getBillingCycleFromSub(rawSub);
 
@@ -354,6 +383,10 @@ export class SubscriptionService {
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
+    );
+
+    this.logger.log(
+      `👤 Found user for subscription upsert: ${existingUser?.id ?? 'NOT FOUND'}`,
     );
 
     const shouldUpdateStatus = !(
