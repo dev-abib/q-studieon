@@ -259,6 +259,7 @@ export class SubscriptionService {
         break;
 
       case 'invoice.payment_succeeded':
+      case 'invoice.paid': // ✅ Fixed: Stripe sends invoice.paid, not invoice.payment_succeeded
         await this.onPaymentSucceeded(payload);
         break;
 
