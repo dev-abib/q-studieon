@@ -13,7 +13,7 @@ import type {
   AiResponse,
   CreateReportResponse,
 } from './types/report.types';
-import { UserRepository } from 'src/common/repositories/user.repository';
+import { UserRepository } from '../common/repositories/user.repository';
 
 @Injectable()
 export class ReportService {

@@ -25,8 +25,8 @@ import {
   type MulterFile,
 } from '../common/pipes/file-validation.pipe';
 import { Public } from '../auth/decorators/public.decorator';
-import { UserService } from 'src/user/user.service';
-import { AdminMailDto } from 'src/auth/dto/admin.mail.dto';
+import { UserService } from '../user/user.service';
+import { AdminMailDto } from '../auth/dto/admin.mail.dto';
 
 @Controller('admin')
 export class AdminController {

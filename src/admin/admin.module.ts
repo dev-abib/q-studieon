@@ -6,7 +6,7 @@ import { UserRepository } from '../common/repositories/user.repository';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtModule } from '@nestjs/jwt';
 import { CloudinaryService } from '../common/services/cloudinary.service';
-import { UserService } from 'src/user/user.service';
+import { UserService } from '../user/user.service';
 
 @Module({
   imports: [JwtModule.register({})],
