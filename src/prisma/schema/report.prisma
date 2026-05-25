@@ -12,7 +12,8 @@ model Report {
   type   String
   status ReportStatus @default(pending)
 
-  placeId String?
+  placeId     String?
+  collections Collection[]
 
   overallAlignmentSummary String?
   overview                String? @db.Text
