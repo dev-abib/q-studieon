@@ -1,4 +1,4 @@
-import { Controller, Body, Post } from '@nestjs/common';
+import { Controller, Body, Post, Get } from '@nestjs/common';
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -16,5 +16,11 @@ export class ReportController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.reportService.createReport(body, user.id);
+  }
+
+  @Get('get-my-reports')
+  @Auth('user')
+  getMyReports(@CurrentUser() user: JwtPayload) {
+    return this.reportService.getMyReports(user.id);
   }
 }

@@ -18,6 +18,7 @@ async function bootstrap() {
     origin: [
       'https://q-studieon-dashboard-next.vercel.app',
       'http://localhost:3001',
+      'https://admin.dwellr.tech',
     ],
 
     credentials: true,

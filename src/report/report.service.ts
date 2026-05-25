@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Report } from '@prisma/client';
 
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
@@ -13,6 +13,7 @@ import type {
   AiResponse,
   CreateReportResponse,
 } from './types/report.types';
+import { UserRepository } from 'src/common/repositories/user.repository';
 
 @Injectable()
 export class ReportService {
@@ -21,6 +22,7 @@ export class ReportService {
     private readonly placeDetailsHelper: PlaceDetailsHelper,
     private readonly numerologyHelpers: NumerologyHelpers,
     private readonly aiHelper: AiHelper,
+    private readonly userRepo: UserRepository,
   ) {}
 
   async createReport(
@@ -73,7 +75,6 @@ export class ReportService {
         familyFlowSummary: report.family_flow.summary,
         familyFlowNarrative: report.family_flow.narrative,
 
-        // ✅ new: entrance direction for UI header
         entranceDirection:
           report.entrance_direction as unknown as Prisma.JsonObject,
 
@@ -100,6 +101,21 @@ export class ReportService {
       success: true,
       message: 'Home alignment report generated successfully',
       data: { saved },
+    };
+  }
+
+  async getMyReports(id: string) {
+    const reports = await this.prisma.report.findMany({
+      where: { userId: id },
+    });
+
+    if (!reports) {
+      throw new NotFoundException('no reports found');
+    }
+
+    return {
+      message: `Reports extracted successfully`,
+      data: reports,
     };
   }
 }
