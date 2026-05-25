@@ -32,7 +32,6 @@ export class SubscriptionService {
       const id = value['id'];
       return typeof id === 'string' ? id : undefined;
     }
-
     return undefined;
   }
 
@@ -283,6 +282,12 @@ export class SubscriptionService {
         await this.onCheckoutSessionCompleted(payload);
         break;
 
+      case 'payment_intent.succeeded':
+        this.logger.log(
+          'ℹ️ payment_intent.succeeded - ignored (handled by invoice events)',
+        );
+        break;
+
       default:
         this.logger.log(`⚠️ Unhandled webhook event: ${eventType}`);
         break;
@@ -290,10 +295,13 @@ export class SubscriptionService {
   }
 
   private async onInvoicePaymentPaid(invoicePayment: unknown) {
+    this.logger.log('💳 onInvoicePaymentPaid triggered');
     if (typeof invoicePayment !== 'object' || invoicePayment === null) return;
 
     const rawPayment = invoicePayment as Record<string, unknown>;
     const invoiceId = this.extractStripeId(rawPayment.invoice);
+
+    this.logger.log(`📄 Invoice ID from invoice_payment.paid: ${invoiceId}`);
 
     if (!invoiceId) return;
 
@@ -305,19 +313,33 @@ export class SubscriptionService {
   }
 
   private async onPaymentSucceeded(invoice: unknown) {
-    if (typeof invoice !== 'object' || invoice === null) return;
+    this.logger.log('💳 onPaymentSucceeded triggered');
     await this.processSuccessfulPayment(invoice);
   }
 
   private async processSuccessfulPayment(invoice: unknown) {
-    if (typeof invoice !== 'object' || invoice === null) return;
+    this.logger.log('🔄 Starting processSuccessfulPayment...');
+
+    if (typeof invoice !== 'object' || invoice === null) {
+      this.logger.warn('❌ Invoice is not an object');
+      return;
+    }
 
     const invoiceObj = invoice as Record<string, unknown>;
 
     const subscriptionId = this.extractStripeId(invoiceObj.subscription);
     const customerId = this.extractStripeId(invoiceObj.customer);
 
-    if (!subscriptionId || !customerId) return;
+    this.logger.log(
+      `📌 Extracted - Subscription: ${subscriptionId}, Customer: ${customerId}`,
+    );
+
+    if (!subscriptionId || !customerId) {
+      this.logger.warn(
+        '⚠️ Missing subscriptionId or customerId - skipping payment creation',
+      );
+      return;
+    }
 
     const rawSub = (await this.stripe.subscriptions.retrieve(
       subscriptionId,
@@ -333,7 +355,13 @@ export class SubscriptionService {
       customerId,
       subscriptionId,
     );
-    if (!existingUser) return;
+
+    this.logger.log(`👤 Found user: ${existingUser?.id ?? 'NOT FOUND'}`);
+
+    if (!existingUser) {
+      this.logger.warn('⚠️ No user found for this payment');
+      return;
+    }
 
     await this.prisma.user.update({
       where: { id: existingUser.id },
@@ -363,6 +391,10 @@ export class SubscriptionService {
         paidAt: new Date(),
       },
     });
+
+    this.logger.log(
+      `✅ Payment record created successfully for user ${existingUser.id}`,
+    );
 
     await this.prisma.subscriptionEvent.create({
       data: {
