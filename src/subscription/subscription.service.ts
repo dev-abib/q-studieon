@@ -26,12 +26,16 @@ export class SubscriptionService {
 
   private extractStripeId(value: unknown): string | undefined {
     if (!value) return undefined;
+
+    // Direct string
     if (typeof value === 'string') return value;
 
-    if (typeof value === 'object' && value !== null && 'id' in value) {
-      const id = value['id'];
-      return typeof id === 'string' ? id : undefined;
+    // Expanded object: { id: "sub_xxx", ... }
+    if (typeof value === 'object' && value !== null) {
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.id === 'string') return obj.id;
     }
+
     return undefined;
   }
 
