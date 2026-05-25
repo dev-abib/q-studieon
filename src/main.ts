@@ -26,7 +26,6 @@ async function bootstrap() {
   });
 
   app.set('trust proxy', 1);
-  app.use(cookieParser());
 
   app.setGlobalPrefix('api/v1');
 
@@ -42,7 +41,7 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
   console.log(
-    `App listening on : http://localhost:${process.env.PORT || '30000'}/${`api/v1`}`,
+    `App listening on : http://localhost:${process.env.PORT || '3000'}/${`api/v1`}`,
   );
 }
 

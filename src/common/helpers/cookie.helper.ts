@@ -14,6 +14,7 @@ export class CookieHelper {
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000,
       path: '/',
+      domain: isProd ? '.dwellr.tech' : undefined,
     });
 
     res.cookie('refreshToken', refreshToken, {
@@ -22,6 +23,7 @@ export class CookieHelper {
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
+      domain: isProd ? '.dwellr.tech' : undefined,
     });
   }
 }
