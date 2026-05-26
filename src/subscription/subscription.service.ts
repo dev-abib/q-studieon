@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
 import { SubscriptionDto, PlanType } from './dto/subscreption.dto';
 
+type RawStripeObject = Record<string, unknown>;
+
 @Injectable()
 export class SubscriptionService {
   private readonly stripe: InstanceType<typeof Stripe>;
@@ -26,16 +28,11 @@ export class SubscriptionService {
 
   private extractStripeId(value: unknown): string | undefined {
     if (!value) return undefined;
-
-    // Direct string
     if (typeof value === 'string') return value;
-
-    // Expanded object: { id: "sub_xxx", ... }
     if (typeof value === 'object' && value !== null) {
-      const obj = value as Record<string, unknown>;
+      const obj = value as RawStripeObject;
       if (typeof obj.id === 'string') return obj.id;
     }
-
     return undefined;
   }
 
@@ -44,14 +41,12 @@ export class SubscriptionService {
       plan === 'monthly'
         ? process.env.STRIPE_MONTHLY_PRICE_ID
         : process.env.STRIPE_YEARLY_PRICE_ID;
-
     if (!priceId) throw new Error(`Missing Stripe price ID for plan: ${plan}`);
     return priceId;
   }
 
   private async getOrCreateStripeCustomer(userId: string): Promise<string> {
     const user = await this.userRepo.findUser('id', userId);
-
     if (user.stripeCustomerId) return user.stripeCustomerId;
 
     const customer = await this.stripe.customers.create({
@@ -68,22 +63,44 @@ export class SubscriptionService {
     return customer.id;
   }
 
-  private getBillingCycleFromSub(rawSub: Record<string, unknown>): bilingCycle {
+  private getBillingCycleFromSub(rawSub: RawStripeObject): bilingCycle {
     const items = Array.isArray(
-      (rawSub.items as Record<string, unknown> | undefined)?.data,
+      (rawSub.items as RawStripeObject | undefined)?.data,
     )
-      ? ((rawSub.items as Record<string, unknown>).data as unknown[])
+      ? ((rawSub.items as RawStripeObject).data as unknown[])
       : [];
     const firstItem =
       typeof items[0] === 'object' && items[0] !== null
-        ? (items[0] as Record<string, unknown>)
+        ? (items[0] as RawStripeObject)
         : null;
     const interval =
-      typeof (firstItem?.plan as Record<string, unknown> | undefined)
-        ?.interval === 'string'
-        ? ((firstItem!.plan as Record<string, unknown>).interval as string)
+      typeof (firstItem?.plan as RawStripeObject | undefined)?.interval ===
+      'string'
+        ? ((firstItem!.plan as RawStripeObject).interval as string)
         : undefined;
     return interval === 'year' ? 'yearly' : 'monthly';
+  }
+
+  private getNumber(obj: RawStripeObject, key: string): number | null {
+    const val = obj[key];
+    return typeof val === 'number' ? val : null;
+  }
+
+  private getString(obj: RawStripeObject, key: string, fallback = ''): string {
+    const val = obj[key];
+    return typeof val === 'string' ? val : fallback;
+  }
+
+  private async retrieveSubscription(id: string): Promise<RawStripeObject> {
+    return (await this.stripe.subscriptions.retrieve(
+      id,
+    )) as unknown as RawStripeObject;
+  }
+
+  private async retrieveInvoice(id: string): Promise<RawStripeObject> {
+    return (await this.stripe.invoices.retrieve(
+      id,
+    )) as unknown as RawStripeObject;
   }
 
   private async findUserByStripeIds(
@@ -156,21 +173,12 @@ export class SubscriptionService {
       cancel_at_period_end: true,
     });
 
-    const rawSub = (await this.stripe.subscriptions.retrieve(
-      user.stripeSubscriptionId,
-    )) as unknown as Record<string, unknown>;
-
-    const currentPeriodEnd =
-      typeof rawSub.current_period_end === 'number'
-        ? rawSub.current_period_end
-        : null;
+    const rawSub = await this.retrieveSubscription(user.stripeSubscriptionId);
+    const currentPeriodEnd = this.getNumber(rawSub, 'current_period_end');
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        status: 'cancelled',
-        currentPeriodEnd: currentPeriodEnd,
-      },
+      data: { status: 'cancelled', currentPeriodEnd },
     });
 
     await this.prisma.subscriptionEvent.create({
@@ -202,9 +210,7 @@ export class SubscriptionService {
       throw new BadRequestException('No active subscription found.');
     }
 
-    const rawSub = (await this.stripe.subscriptions.retrieve(
-      user.stripeSubscriptionId,
-    )) as unknown as Record<string, unknown>;
+    const rawSub = await this.retrieveSubscription(user.stripeSubscriptionId);
 
     if (!rawSub.cancel_at_period_end) {
       throw new BadRequestException(
@@ -240,7 +246,7 @@ export class SubscriptionService {
         process.env.STRIPE_WEBHOOK_SECRET as string,
       );
       this.logger.log(
-        `✅ Webhook received: ${(event as { type: string }).type}`,
+        `✅ Webhook received: ${String((event as RawStripeObject).type)}`,
       );
     } catch (err) {
       this.logger.error(`❌ Webhook signature failed: ${err}`);
@@ -249,14 +255,14 @@ export class SubscriptionService {
 
     const eventType =
       typeof event === 'object' && event !== null && 'type' in event
-        ? (event as { type: string }).type
+        ? ((event as RawStripeObject).type as string)
         : undefined;
 
     if (!eventType) return;
 
     const payload =
       typeof event === 'object' && event !== null && 'data' in event
-        ? (event as { data: { object?: unknown } }).data.object
+        ? ((event as RawStripeObject).data as RawStripeObject).object
         : undefined;
 
     switch (eventType) {
@@ -273,22 +279,26 @@ export class SubscriptionService {
         await this.onPaymentFailed(payload);
         break;
 
+      // invoice.paid / invoice.payment_succeeded = full Invoice object
       case 'invoice.payment_succeeded':
       case 'invoice.paid':
-        await this.onPaymentSucceeded(payload);
+        await this.onInvoicePaid(payload);
         break;
 
+      // invoice_payment.paid = InvoicePayment object (2025+ API versions)
+      // No customer/subscription on payload — must fetch the invoice
       case 'invoice_payment.paid':
         await this.onInvoicePaymentPaid(payload);
         break;
 
+      // Only links subscriptionId to user — payment row created by invoice_payment.paid
       case 'checkout.session.completed':
         await this.onCheckoutSessionCompleted(payload);
         break;
 
       case 'payment_intent.succeeded':
         this.logger.log(
-          'ℹ️ payment_intent.succeeded - ignored (handled by invoice events)',
+          'ℹ️ payment_intent.succeeded — ignored, handled via invoice events',
         );
         break;
 
@@ -298,107 +308,88 @@ export class SubscriptionService {
     }
   }
 
-  private async onInvoicePaymentPaid(invoicePayment: unknown) {
+  // ─── invoice_payment.paid ────────────────────────────────────────────────────
+  // Payload: { invoice: "in_xxx", amount_paid, currency, payment: { payment_intent } }
+  // No customer/subscription directly — fetch the invoice to get them.
+  private async onInvoicePaymentPaid(payload: unknown) {
     this.logger.log('💳 onInvoicePaymentPaid triggered');
-    if (typeof invoicePayment !== 'object' || invoicePayment === null) return;
+    if (typeof payload !== 'object' || payload === null) return;
 
-    const rawPayment = invoicePayment as Record<string, unknown>;
-    const invoiceId = this.extractStripeId(rawPayment.invoice);
+    const raw = payload as RawStripeObject;
+    const invoiceId = this.extractStripeId(raw.invoice);
+    this.logger.log(`📄 invoiceId: ${invoiceId}`);
 
-    this.logger.log(`📄 Invoice ID from invoice_payment.paid: ${invoiceId}`);
-
-    if (!invoiceId) return;
-
-    const invoice = await this.stripe.invoices.retrieve(invoiceId, {
-      expand: ['customer', 'subscription'],
-    });
-
-    await this.processSuccessfulPayment(invoice);
-  }
-
-  private async onPaymentSucceeded(invoice: unknown) {
-    this.logger.log('💳 onPaymentSucceeded triggered');
-    await this.processSuccessfulPayment(invoice);
-  }
-
-  private async processSuccessfulPayment(invoice: unknown) {
-    this.logger.log('🔄 Starting processSuccessfulPayment...');
-
-    if (typeof invoice !== 'object' || invoice === null) {
-      this.logger.warn('❌ Invoice is not an object');
+    if (!invoiceId) {
+      this.logger.warn('⚠️ invoice_payment.paid — no invoiceId, skipping');
       return;
     }
 
-    const invoiceObj = invoice as Record<string, unknown>;
-
-    const subscriptionId = this.extractStripeId(invoiceObj.subscription);
-    const customerId = this.extractStripeId(invoiceObj.customer);
+    const invoice = await this.retrieveInvoice(invoiceId);
+    const customerId = this.extractStripeId(invoice.customer);
+    const subscriptionId = this.extractStripeId(invoice.subscription);
 
     this.logger.log(
-      `📌 Extracted - Subscription: ${subscriptionId}, Customer: ${customerId}`,
+      `💳 invoice_payment.paid — customerId: ${customerId}, subscriptionId: ${subscriptionId}`,
     );
 
-    if (!subscriptionId || !customerId) {
-      this.logger.warn(
-        '⚠️ Missing subscriptionId or customerId - skipping payment creation',
-      );
+    if (!customerId) {
+      this.logger.warn('⚠️ invoice_payment.paid — no customerId on invoice');
       return;
     }
-
-    const rawSub = (await this.stripe.subscriptions.retrieve(
-      subscriptionId,
-    )) as unknown as Record<string, unknown>;
-
-    const billingCycle = this.getBillingCycleFromSub(rawSub);
-    const currentPeriodEnd =
-      typeof rawSub.current_period_end === 'number'
-        ? rawSub.current_period_end
-        : null;
 
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
     );
-
     this.logger.log(`👤 Found user: ${existingUser?.id ?? 'NOT FOUND'}`);
+    if (!existingUser) return;
 
-    if (!existingUser) {
-      this.logger.warn('⚠️ No user found for this payment');
-      return;
+    let rawSub: RawStripeObject | null = null;
+    if (subscriptionId) {
+      rawSub = await this.retrieveSubscription(subscriptionId);
     }
+
+    const billingCycle: bilingCycle = rawSub
+      ? this.getBillingCycleFromSub(rawSub)
+      : (existingUser.billingCycle ?? 'monthly');
+
+    const currentPeriodEnd = rawSub
+      ? this.getNumber(rawSub, 'current_period_end')
+      : null;
+
+    const amountPaid =
+      this.getNumber(invoice, 'amount_paid') ??
+      this.getNumber(raw, 'amount_paid') ??
+      0;
+
+    const currency =
+      this.getString(invoice, 'currency') ||
+      this.getString(raw, 'currency') ||
+      'usd';
+
+    const paymentIntentId =
+      this.extractStripeId(invoice.payment_intent) ??
+      this.extractStripeId(
+        (raw.payment as RawStripeObject | undefined)?.payment_intent,
+      );
 
     await this.prisma.user.update({
       where: { id: existingUser.id },
-      data: {
-        status: 'active',
-        isPaid: true,
-        currentPeriodEnd,
-      },
+      data: { status: 'active', isPaid: true, currentPeriodEnd },
     });
 
     await this.prisma.payment.create({
       data: {
         userId: existingUser.id,
-        amount:
-          typeof invoiceObj.amount_paid === 'number'
-            ? invoiceObj.amount_paid
-            : 0,
-        currency:
-          typeof invoiceObj.currency === 'string' ? invoiceObj.currency : 'usd',
+        amount: amountPaid,
+        currency,
         status: 'succeeded',
         billingCycle,
-        stripeInvoiceId: typeof invoiceObj.id === 'string' ? invoiceObj.id : '',
-        stripePaymentIntentId:
-          typeof invoiceObj.payment_intent === 'string'
-            ? invoiceObj.payment_intent
-            : undefined,
+        stripeInvoiceId: invoiceId,
+        stripePaymentIntentId: paymentIntentId,
         paidAt: new Date(),
       },
     });
-
-    this.logger.log(
-      `✅ Payment record created successfully for user ${existingUser.id}`,
-    );
 
     await this.prisma.subscriptionEvent.create({
       data: {
@@ -410,66 +401,134 @@ export class SubscriptionService {
         previousBillingCycle: existingUser.billingCycle ?? undefined,
       },
     });
+
+    this.logger.log(`✅ Payment created for userId: ${existingUser.id}`);
   }
 
-  private async onCheckoutSessionCompleted(session: unknown) {
-    if (typeof session !== 'object' || session === null) return;
-    const rawSession = session as Record<string, unknown>;
+  // ─── invoice.paid / invoice.payment_succeeded ────────────────────────────────
+  // Payload IS a full Invoice — customer + subscription are directly on it.
+  private async onInvoicePaid(payload: unknown) {
+    this.logger.log('💳 onInvoicePaid triggered');
+    if (typeof payload !== 'object' || payload === null) return;
 
-    const subscriptionId = this.extractStripeId(rawSession.subscription);
-    const customerId = this.extractStripeId(rawSession.customer);
+    const invoice = payload as RawStripeObject;
+    const customerId = this.extractStripeId(invoice.customer);
+    const subscriptionId = this.extractStripeId(invoice.subscription);
 
-    if (!subscriptionId || !customerId) return;
+    this.logger.log(
+      `💳 onInvoicePaid — customerId: ${customerId}, subscriptionId: ${subscriptionId}`,
+    );
+
+    if (!customerId) {
+      this.logger.warn('⚠️ onInvoicePaid — no customerId');
+      return;
+    }
 
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
     );
+    this.logger.log(`👤 Found user: ${existingUser?.id ?? 'NOT FOUND'}`);
     if (!existingUser) return;
 
-    const rawSub = (await this.stripe.subscriptions.retrieve(
-      subscriptionId,
-    )) as unknown as Record<string, unknown>;
+    let rawSub: RawStripeObject | null = null;
+    if (subscriptionId) {
+      rawSub = await this.retrieveSubscription(subscriptionId);
+    }
 
-    const billingCycle = this.getBillingCycleFromSub(rawSub);
-    const currentPeriodEnd =
-      typeof rawSub.current_period_end === 'number'
-        ? rawSub.current_period_end
-        : null;
+    const billingCycle: bilingCycle = rawSub
+      ? this.getBillingCycleFromSub(rawSub)
+      : (existingUser.billingCycle ?? 'monthly');
 
-    await Promise.all([
-      this.prisma.payment.create({
-        data: {
-          userId: existingUser.id,
-          amount:
-            typeof rawSession.amount_total === 'number'
-              ? rawSession.amount_total
-              : 0,
-          currency: (rawSession.currency as string) || 'usd',
-          status: 'succeeded',
-          billingCycle,
-          stripeInvoiceId: undefined,
-          paidAt: new Date(),
-        },
-      }),
-      this.prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          status: 'active',
-          isPaid: true,
-          stripeSubscriptionId: subscriptionId,
-          currentPeriodEnd,
-        },
-      }),
-    ]);
+    const currentPeriodEnd = rawSub
+      ? this.getNumber(rawSub, 'current_period_end')
+      : null;
+
+    await this.prisma.user.update({
+      where: { id: existingUser.id },
+      data: { status: 'active', isPaid: true, currentPeriodEnd },
+    });
+
+    await this.prisma.payment.create({
+      data: {
+        userId: existingUser.id,
+        amount: this.getNumber(invoice, 'amount_paid') ?? 0,
+        currency: this.getString(invoice, 'currency', 'usd'),
+        status: 'succeeded',
+        billingCycle,
+        stripeInvoiceId: this.getString(invoice, 'id') || undefined,
+        stripePaymentIntentId: this.extractStripeId(invoice.payment_intent),
+        paidAt: new Date(),
+      },
+    });
+
+    await this.prisma.subscriptionEvent.create({
+      data: {
+        userId: existingUser.id,
+        event: 'renewed',
+        status: 'active',
+        billingCycle,
+        previousStatus: existingUser.status ?? undefined,
+        previousBillingCycle: existingUser.billingCycle ?? undefined,
+      },
+    });
+
+    this.logger.log(`✅ Payment created for userId: ${existingUser.id}`);
   }
 
+  // ─── checkout.session.completed ──────────────────────────────────────────────
+  // Only links subscriptionId to user — NO payment row created here.
+  // Payment row is created by invoice_payment.paid which fires right after.
+  private async onCheckoutSessionCompleted(session: unknown) {
+    if (typeof session !== 'object' || session === null) return;
+    const rawSession = session as RawStripeObject;
+
+    const subscriptionId = this.extractStripeId(rawSession.subscription);
+    const customerId = this.extractStripeId(rawSession.customer);
+
+    this.logger.log(
+      `🔔 Checkout completed — customerId: ${customerId}, subscriptionId: ${subscriptionId}`,
+    );
+
+    if (!subscriptionId || !customerId) {
+      this.logger.warn('⚠️ checkout.session.completed — missing ids');
+      return;
+    }
+
+    const existingUser = await this.findUserByStripeIds(
+      customerId,
+      subscriptionId,
+    );
+    this.logger.log(`👤 Found user: ${existingUser?.id ?? 'NOT FOUND'}`);
+    if (!existingUser) return;
+
+    const rawSub = await this.retrieveSubscription(subscriptionId);
+    const currentPeriodEnd = this.getNumber(rawSub, 'current_period_end');
+
+    await this.prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        status: 'active',
+        isPaid: true,
+        stripeSubscriptionId: subscriptionId,
+        currentPeriodEnd,
+      },
+    });
+
+    this.logger.log(
+      `✅ User updated for checkout — userId: ${existingUser.id}`,
+    );
+  }
+
+  // ─── onSubscriptionUpsert ────────────────────────────────────────────────────
   private async onSubscriptionUpsert(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
-    const rawSub = stripeSub as Record<string, unknown>;
+    const rawSub = stripeSub as RawStripeObject;
 
     const customerId = this.extractStripeId(rawSub.customer);
     if (!customerId) return;
+
+    this.logger.log(`🔄 Subscription upsert — customerId: ${customerId}`);
 
     const plan: bilingCycle = this.getBillingCycleFromSub(rawSub);
 
@@ -495,15 +554,13 @@ export class SubscriptionService {
 
     const subscriptionId =
       typeof rawSub.id === 'string' ? rawSub.id : undefined;
-    const currentPeriodEnd =
-      typeof rawSub.current_period_end === 'number'
-        ? rawSub.current_period_end
-        : null;
+    const currentPeriodEnd = this.getNumber(rawSub, 'current_period_end');
 
     const existingUser = await this.findUserByStripeIds(
       customerId,
       subscriptionId,
     );
+    this.logger.log(`👤 Found user: ${existingUser?.id ?? 'NOT FOUND'}`);
 
     const shouldUpdateStatus = !(
       (existingUser?.status === 'active' ||
@@ -523,7 +580,7 @@ export class SubscriptionService {
         stripeSubscriptionId: subscriptionId ?? undefined,
         billingCycle: plan,
         isPaid: cancelAtPeriodEnd ? true : isPaid,
-        currentPeriodEnd: currentPeriodEnd,
+        currentPeriodEnd,
         ...(shouldUpdateStatus && { status: resolvedStatus }),
       },
     });
@@ -557,9 +614,10 @@ export class SubscriptionService {
     }
   }
 
+  // ─── onSubscriptionDeleted ───────────────────────────────────────────────────
   private async onSubscriptionDeleted(stripeSub: unknown) {
     if (typeof stripeSub !== 'object' || stripeSub === null) return;
-    const rawSub = stripeSub as Record<string, unknown>;
+    const rawSub = stripeSub as RawStripeObject;
 
     const customerId = this.extractStripeId(rawSub.customer);
     if (!customerId) return;
@@ -601,9 +659,10 @@ export class SubscriptionService {
     }
   }
 
+  // ─── onPaymentFailed ─────────────────────────────────────────────────────────
   private async onPaymentFailed(invoice: unknown) {
     if (typeof invoice !== 'object' || invoice === null) return;
-    const rawInvoice = invoice as Record<string, unknown>;
+    const rawInvoice = invoice as RawStripeObject;
 
     const customerId = this.extractStripeId(rawInvoice.customer);
     if (!customerId) return;
@@ -612,9 +671,7 @@ export class SubscriptionService {
 
     let billingCycle: bilingCycle = 'monthly';
     if (subscriptionId) {
-      const rawSub = (await this.stripe.subscriptions.retrieve(
-        subscriptionId,
-      )) as unknown as Record<string, unknown>;
+      const rawSub = await this.retrieveSubscription(subscriptionId);
       billingCycle = this.getBillingCycleFromSub(rawSub);
     }
 
@@ -638,18 +695,11 @@ export class SubscriptionService {
         this.prisma.payment.create({
           data: {
             userId: existingUser.id,
-            amount:
-              typeof rawInvoice.amount_due === 'number'
-                ? rawInvoice.amount_due
-                : 0,
-            currency:
-              typeof rawInvoice.currency === 'string'
-                ? rawInvoice.currency
-                : 'usd',
+            amount: this.getNumber(rawInvoice, 'amount_due') ?? 0,
+            currency: this.getString(rawInvoice, 'currency', 'usd'),
             status: 'failed',
             billingCycle,
-            stripeInvoiceId:
-              typeof rawInvoice.id === 'string' ? rawInvoice.id : undefined,
+            stripeInvoiceId: this.getString(rawInvoice, 'id') || undefined,
             paidAt: null,
           },
         }),
