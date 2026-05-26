@@ -18,6 +18,7 @@ import { DynamicPageController } from './dynamic-page/dynamic-page.controller';
 import { DynamicPageService } from './dynamic-page/dynamic-page.service';
 import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
 import { ReportModule } from './report/report.module';
+import { OnsiteReportModule } from './onsite-report/onsite-report.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ReportModule } from './report/report.module';
     TasksModule,
     DynamicPageModule,
     ReportModule,
+    OnsiteReportModule,
   ],
   controllers: [AppController, SubscriptionController, DynamicPageController],
   providers: [
