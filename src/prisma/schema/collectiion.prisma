@@ -1,0 +1,30 @@
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports ReportCollection[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("collections")
+}
+
+model ReportCollection {
+  id           String   @id @default(cuid())
+  reportId     String
+  collectionId String
+  addedAt      DateTime @default(now())
+
+  report     Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, collectionId])
+  @@index([reportId])
+  @@index([collectionId])
+  @@map("report_collections")
+}

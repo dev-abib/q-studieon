@@ -49,6 +49,8 @@ model Report {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  ReportCollection ReportCollection[]
+
   @@index([userId])
   @@index([createdAt])
   @@index([type])

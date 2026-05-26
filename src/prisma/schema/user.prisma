@@ -69,6 +69,7 @@ model User {
   payments           Payment[]
   subscriptionEvents SubscriptionEvent[]
   reports            Report[]
+  collections        Collection[]
 
   // indexes
   @@index([createdAt])

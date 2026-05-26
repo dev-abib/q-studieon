@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
 import { SubmitOnsiteReportDto } from './helpers/dto/submit-report.dto';
+import { CreateCollectionDto } from './helpers/dto/collection.dto';
 
 function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
@@ -201,5 +202,140 @@ export class OnsiteReportService {
     if (!data) throw new NotFoundException('Report not found.');
 
     return { success: true, data };
+  }
+
+  async createCollection(dto: CreateCollectionDto, userId: string) {
+    const name = dto.name.trim();
+
+    // Check duplicate name
+    const existing = await this.prisma.collection.findUnique({
+      where: {
+        userId_name: { userId, name },
+      },
+    });
+
+    if (existing) {
+      return {
+        success: false,
+        message: `Collection with name "${name}" already exists`,
+      };
+    }
+
+    const collection = await this.prisma.collection.create({
+      data: {
+        userId,
+        name,
+        description: dto.description?.trim() ?? null,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Collection created successfully',
+      data: collection,
+    };
+  }
+
+  async getCollections(userId: string) {
+    const collections = await this.prisma.collection.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { reports: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: collections,
+    };
+  }
+
+  async addReportToCollection(
+    collectionId: string,
+    reportId: string,
+    userId: string,
+  ) {
+    // Check report ownership
+    const report = await this.prisma.report.findFirst({
+      where: { id: reportId },
+    });
+
+    if (!report || report.userId !== userId) {
+      throw new NotFoundException('Report not found or access denied');
+    }
+
+    // Check collection ownership
+    const collection = await this.prisma.collection.findFirst({
+      where: { id: collectionId, userId },
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection not found or access denied');
+    }
+
+    // Check if already added
+    const existing = await this.prisma.reportCollection.findUnique({
+      where: {
+        reportId_collectionId: { reportId, collectionId },
+      },
+    });
+
+    if (existing) {
+      return {
+        success: true,
+        message: 'Report is already in this collection',
+        data: existing,
+      };
+    }
+
+    // Add to collection
+    const link = await this.prisma.reportCollection.create({
+      data: { reportId, collectionId },
+    });
+
+    return {
+      success: true,
+      message: 'Report added to collection successfully',
+      data: link,
+    };
+  }
+
+  async getCollectionsWithReports(userId: string) {
+    const collections = await this.prisma.collection.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        reports: {
+          include: {
+            report: {
+              select: reportListSelect,
+            },
+          },
+          orderBy: { addedAt: 'desc' },
+        },
+      },
+    });
+
+    const recentStandaloneReports = await this.prisma.report.findMany({
+      where: {
+        userId,
+        type: 'onsite_property_report',
+        ReportCollection: { none: {} },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 4,
+      select: reportListSelect,
+    });
+
+    return {
+      success: true,
+      data: {
+        collections,
+        recentStandaloneReports,
+      },
+    };
   }
 }

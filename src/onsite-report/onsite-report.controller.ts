@@ -4,6 +4,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt.types';
 import { Auth } from '../auth/decorators/auth.decorator';
 import { SubmitOnsiteReportDto } from './helpers/dto/submit-report.dto';
+import {
+  AddReportToCollectionDto,
+  CreateCollectionDto,
+} from './helpers/dto/collection.dto';
 
 @Controller('onsite-report')
 export class OnsiteReportController {
@@ -25,6 +29,42 @@ export class OnsiteReportController {
     return this.onsiteReportService.getMyReports(user.id);
   }
 
+  @Post('collections')
+  @Auth('user')
+  createCollection(
+    @Body() dto: CreateCollectionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.onsiteReportService.createCollection(dto, user.id);
+  }
+
+  @Get('collections')
+  @Auth('user')
+  getMyCollections(@CurrentUser() user: JwtPayload) {
+    return this.onsiteReportService.getCollections(user.id);
+  }
+
+  @Post('collections/:collectionId/add')
+  @Auth('user')
+  addToCollection(
+    @Param('collectionId') collectionId: string,
+    @Body() dto: AddReportToCollectionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.onsiteReportService.addReportToCollection(
+      collectionId,
+      dto.reportId,
+      user.id,
+    );
+  }
+
+  @Get('collections-with-reports')
+  @Auth('user')
+  getCollectionsWithReports(@CurrentUser() user: JwtPayload) {
+    return this.onsiteReportService.getCollectionsWithReports(user.id);
+  }
+
+  // ==================== DYNAMIC ROUTE - MUST BE LAST ====================
   /**
    * Fetch a single full report by ID.
    *
