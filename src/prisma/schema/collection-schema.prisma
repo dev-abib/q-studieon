@@ -1,5 +1,0 @@
-model Collection {
-  id       String  @id() @default(cuid())
-  reportId String?
-  report   Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
-}
