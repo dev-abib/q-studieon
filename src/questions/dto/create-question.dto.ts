@@ -1,5 +1,4 @@
-import { IsString, IsNotEmpty, IsEnum, MinLength } from 'class-validator';
-import { AnswerOption } from '@prisma/client';
+import { IsString, IsNotEmpty, IsArray, MinLength } from 'class-validator';
 
 export class CreateQuestionDto {
   @IsString()
@@ -11,7 +10,8 @@ export class CreateQuestionDto {
   @IsNotEmpty({ message: 'Slug is required' })
   slug: string;
 
-  @IsEnum(AnswerOption, { each: true, message: 'Invalid answer option' })
+  @IsArray()
+  @IsString({ each: true, message: 'Each option must be a string' })
   @IsNotEmpty({ message: 'Options are required' })
-  options: AnswerOption[];
+  options: string[];
 }

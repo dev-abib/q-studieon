@@ -25,34 +25,38 @@ export class QuestionsController {
     return this.questionsService.createQuestion(dto);
   }
 
-  // get all questions controller
+  // get all questions controller (literal path before :id)
   @Get('get-all-questions')
   @Auth('admin')
   getAllQuestions(@Query() dto: GetAllQuestionsDto) {
     return this.questionsService.getAllQuestions(dto);
   }
 
-  // get question by slug controller
-  @Get('question/:slug')
+  // get questions by slug controller (literal+param path before bare :id)
+  @Get('by-slug/:slug')
   @Auth('admin')
-  getQuestionBySlug(@Param('slug') slug: string) {
-    return this.questionsService.getQuestionBySlug(slug);
+  getQuestionsBySlug(@Param('slug') slug: string) {
+    return this.questionsService.getQuestionsBySlug(slug);
   }
 
-  // update question by slug controller
-  @Put('update-question/:slug')
+  // get question by ID controller
+  @Get(':id')
   @Auth('admin')
-  updateQuestionBySlug(
-    @Param('slug') slug: string,
-    @Body() dto: UpdateQuestionDto,
-  ) {
-    return this.questionsService.updateQuestionBySlug(slug, dto);
+  getQuestionById(@Param('id') id: string) {
+    return this.questionsService.getQuestionById(id);
   }
 
-  // delete question by slug controller
-  @Delete('delete-question/:slug')
+  // update question by ID controller
+  @Put(':id')
   @Auth('admin')
-  deleteQuestion(@Param('slug') slug: string) {
-    return this.questionsService.deleteQuestion(slug);
+  updateQuestionById(@Param('id') id: string, @Body() dto: UpdateQuestionDto) {
+    return this.questionsService.updateQuestionById(id, dto);
+  }
+
+  // delete question by ID controller
+  @Delete(':id')
+  @Auth('admin')
+  deleteQuestionById(@Param('id') id: string) {
+    return this.questionsService.deleteQuestionById(id);
   }
 }

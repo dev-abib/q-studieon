@@ -1,5 +1,4 @@
-import { IsOptional, IsString, IsEnum } from 'class-validator';
-import { AnswerOption } from '@prisma/client';
+import { IsOptional, IsString, IsArray } from 'class-validator';
 import { AtLeastOneField } from '../../auth/decorators/at-least-one-filed.dto';
 
 export class UpdateQuestionDto {
@@ -12,7 +11,8 @@ export class UpdateQuestionDto {
   @IsOptional()
   slug?: string;
 
-  @IsEnum(AnswerOption, { each: true })
+  @IsArray()
+  @IsString({ each: true, message: 'Each option must be a string' })
   @IsOptional()
-  options?: AnswerOption[];
+  options?: string[];
 }

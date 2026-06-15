@@ -1,28 +1,19 @@
 model AnalyticsSnapshot {
-  id   String   @id @default(cuid())
-  date DateTime @unique
-
-  // users
-  totalUsers          Int @default(0)
-  newUsers            Int @default(0)
-  guestUsers          Int @default(0)
-  registeredUsers     Int @default(0)
-  activeSubscriptions Int @default(0)
-
-  // reports
-  reportsGenerated Int @default(0)
-  reportsFailed    Int @default(0)
-
-  // revenue (in cents)
-  revenue        Int @default(0)
-  monthlyRevenue Int @default(0)
-  yearlyRevenue  Int @default(0)
-
-  // billing cycle breakdown
-  monthlyPlanCount Int @default(0)
-  yearlyPlanCount  Int @default(0)
-
-  createdAt DateTime @default(now())
+  id                  String   @id @default(cuid())
+  date                DateTime @unique
+  totalUsers          Int      @default(0)
+  newUsers            Int      @default(0)
+  guestUsers          Int      @default(0)
+  registeredUsers     Int      @default(0)
+  activeSubscriptions Int      @default(0)
+  reportsGenerated    Int      @default(0)
+  reportsFailed       Int      @default(0)
+  revenue             Int      @default(0)
+  monthlyRevenue      Int      @default(0)
+  yearlyRevenue       Int      @default(0)
+  monthlyPlanCount    Int      @default(0)
+  yearlyPlanCount     Int      @default(0)
+  createdAt           DateTime @default(now())
 
   @@index([date])
   @@map("analytics_snapshots")

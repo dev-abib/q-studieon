@@ -1,55 +1,36 @@
-enum ReportStatus {
-  pending
-  completed
-  failed
-}
-
 model Report {
-  id     String  @id @default(cuid())
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  type   String
-  status ReportStatus @default(pending)
-
-  placeId String?
-
-  overallAlignmentSummary String?
-  overview                String? @db.Text
-  overallScore            Int?
+  id                      String             @id @default(cuid())
+  userId                  String?
+  type                    String
+  status                  ReportStatus       @default(pending)
+  metadata                Json?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  aiModel                 String?
   auspiciousnessLevel     String?
   auspiciousnessSummary   String?
-
-  familyFlowSummary   String?
-  familyFlowNarrative String? @db.Text
-
-  entranceDirection Json? // { degrees, cardinal, label }
-  entranceEnergy    Json? // { narrative, confidenceLevel, confidenceNote, tags[] }
-  numerology        Json? // { addressNumber, fullAddressNumber, theme, narrative, tags[] }
-  fengShui          Json? // { narrative, ruleSummary, tags[] }
-  vastu             Json? // { narrative, ruleSummary, tags[] }
-
-  indicators        Json? // [{ type: "supportive"|"red_flag", value }]
-  practicalRemedies Json? // string[]
-  helpfulTips       Json? // string[]
-  lifeAspects       Json? // { relationships: { narrative, flags[] }, ... }
-  photos            Json? // [{ url, width, height }]
-
-  // ── AI Metadata ───────────────────────────
-
-  aiModel          String?
-  promptTokens     Int?
-  completionTokens Int?
-  totalTokens      Int?
-  finishReason     String?
-
-  // ── Base ──────────────────────────────────
-
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  ReportCollection ReportCollection[]
+  completionTokens        Int?
+  entranceDirection       Json?
+  entranceEnergy          Json?
+  familyFlowNarrative     String?
+  familyFlowSummary       String?
+  fengShui                Json?
+  finishReason            String?
+  helpfulTips             Json?
+  indicators              Json?
+  lifeAspects             Json?
+  numerology              Json?
+  overallAlignmentSummary String?
+  overallScore            Int?
+  overview                String?
+  photos                  Json?
+  placeId                 String?
+  practicalRemedies       Json?
+  promptTokens            Int?
+  totalTokens             Int?
+  vastu                   Json?
+  ReportCollection        ReportCollection[]
+  user                    User?              @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([createdAt])
@@ -57,4 +38,10 @@ model Report {
   @@index([status])
   @@index([placeId])
   @@map("reports")
+}
+
+enum ReportStatus {
+  pending
+  completed
+  failed
 }

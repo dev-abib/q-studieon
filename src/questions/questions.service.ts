@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -14,15 +10,7 @@ export class QuestionsService {
 
   // create question service
   async createQuestion(dto: CreateQuestionDto) {
-    let question = await this.prisma.question.findUnique({
-      where: { slug: dto.slug },
-    });
-
-    if (question) {
-      throw new ConflictException('A question with this slug already exists');
-    }
-
-    question = await this.prisma.question.create({
+    const question = await this.prisma.question.create({
       data: {
         text: dto.text,
         slug: dto.slug,
@@ -38,10 +26,10 @@ export class QuestionsService {
     };
   }
 
-  // get question by slug service
-  async getQuestionBySlug(slug: string) {
+  // get question by ID service
+  async getQuestionById(id: string) {
     const question = await this.prisma.question.findUnique({
-      where: { slug },
+      where: { id },
     });
 
     if (!question) {
@@ -52,6 +40,21 @@ export class QuestionsService {
       message: 'Question retrieved successfully',
       data: {
         question,
+      },
+    };
+  }
+
+  // get questions by slug service (returns ALL questions with that slug)
+  async getQuestionsBySlug(slug: string) {
+    const questions = await this.prisma.question.findMany({
+      where: { slug },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      message: 'Questions retrieved successfully',
+      data: {
+        questions,
       },
     };
   }
@@ -87,10 +90,6 @@ export class QuestionsService {
       }),
     ]);
 
-    if (total === 0) {
-      throw new NotFoundException('No questions found');
-    }
-
     const totalPages = Math.ceil(total / limit);
 
     return {
@@ -109,29 +108,18 @@ export class QuestionsService {
     };
   }
 
-  // update question by slug service
-  async updateQuestionBySlug(slug: string, dto: UpdateQuestionDto) {
-    // Check if question exists
+  // update question by ID service
+  async updateQuestionById(id: string, dto: UpdateQuestionDto) {
     const existing = await this.prisma.question.findUnique({
-      where: { slug },
+      where: { id },
     });
 
     if (!existing) {
       throw new NotFoundException('Question not found');
     }
 
-    // If slug is being changed, check for conflicts
-    if (dto.slug && dto.slug !== slug) {
-      const slugConflict = await this.prisma.question.findUnique({
-        where: { slug: dto.slug },
-      });
-      if (slugConflict) {
-        throw new ConflictException('A question with this slug already exists');
-      }
-    }
-
     const question = await this.prisma.question.update({
-      where: { slug },
+      where: { id },
       data: {
         ...(dto.text !== undefined && { text: dto.text }),
         ...(dto.slug !== undefined && { slug: dto.slug }),
@@ -147,10 +135,10 @@ export class QuestionsService {
     };
   }
 
-  // delete question by slug service
-  async deleteQuestion(slug: string) {
+  // delete question by ID service
+  async deleteQuestionById(id: string) {
     const existing = await this.prisma.question.findUnique({
-      where: { slug },
+      where: { id },
     });
 
     if (!existing) {
@@ -158,7 +146,7 @@ export class QuestionsService {
     }
 
     await this.prisma.question.delete({
-      where: { slug },
+      where: { id },
     });
 
     return {

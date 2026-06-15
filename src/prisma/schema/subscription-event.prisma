@@ -1,3 +1,20 @@
+model SubscriptionEvent {
+  id                   String                @id @default(cuid())
+  userId               String?
+  event                SubscriptionEventType
+  status               subscriptionStatus
+  billingCycle         bilingCycle?
+  previousStatus       subscriptionStatus?
+  previousBillingCycle bilingCycle?
+  createdAt            DateTime              @default(now())
+  user                 User?                 @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([event])
+  @@map("subscription_events")
+}
+
 enum SubscriptionEventType {
   trial_started
   activated
@@ -7,25 +24,4 @@ enum SubscriptionEventType {
   renewed
   payment_failed
   reactivated
-}
-
-model SubscriptionEvent {
-  id     String  @id @default(cuid())
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  event        SubscriptionEventType
-  status       subscriptionStatus
-  billingCycle bilingCycle?
-
-  // snapshot of what changed
-  previousStatus       subscriptionStatus?
-  previousBillingCycle bilingCycle?
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([createdAt])
-  @@index([event])
-  @@map("subscription_events")
 }

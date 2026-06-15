@@ -1,3 +1,45 @@
+model User {
+  id                     String              @id @default(cuid())
+  name                   String?
+  email                  String?             @unique
+  password               String?
+  profilePictureURL      String?
+  profilePicturePublicId String?
+  isPaid                 Boolean?            @default(false)
+  isGuest                Boolean?
+  isOtpVerified          Boolean?            @default(false)
+  otp                    String?
+  otpAttempts            Int?                @default(0)
+  otpExpires             DateTime?
+  refreshToken           String?
+  resetToken             String?
+  guestExpiresAt         DateTime?
+  authProvider           AuthProvider?       @default(local)
+  billingCycle           bilingCycle?        @default(monthly)
+  status                 subscriptionStatus? @default(free)
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  currentPeriodEnd       Int?
+  role                   role                @default(user)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  termsAndConditions     Boolean             @default(false)
+  blockedUntil           DateTime?
+  guestIp                String?
+  guestDeviceId          String?
+  isResetRequest         Boolean?            @default(false)
+  collections            Collection[]
+  payments               Payment[]
+  reports                Report[]
+  subscriptionEvents     SubscriptionEvent[]
+
+  @@index([createdAt])
+  @@index([isGuest])
+  @@index([status])
+  @@index([isPaid])
+  @@map("users")
+}
+
 enum AuthProvider {
   local
   google
@@ -23,58 +65,4 @@ enum role {
   user
   admin
   super_admin
-}
-
-model User {
-  id                     String  @id @default(cuid())
-  name                   String?
-  email                  String? @unique
-  password               String?
-  profilePictureURL      String?
-  profilePicturePublicId String?
-
-  isPaid        Boolean? @default(false)
-  isGuest       Boolean?
-  isOtpVerified Boolean? @default(false)
-
-  otp         String?
-  otpAttempts Int?      @default(0)
-  otpExpires  DateTime?
-
-  refreshToken String?
-  resetToken   String?
-
-  guestExpiresAt DateTime?
-
-  authProvider AuthProvider? @default(local)
-
-  billingCycle bilingCycle?        @default(monthly)
-  status       subscriptionStatus? @default(free)
-
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  currentPeriodEnd     Int?
-
-  role role @default(user)
-
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  termsAndConditions Boolean   @default(false)
-  blockedUntil       DateTime?
-  guestIp            String?
-  guestDeviceId      String?
-  isResetRequest     Boolean?  @default(false)
-
-  // relations
-  payments           Payment[]
-  subscriptionEvents SubscriptionEvent[]
-  reports            Report[]
-  collections        Collection[]
-
-  // indexes
-  @@index([createdAt])
-  @@index([isGuest])
-  @@index([status])
-  @@index([isPaid])
-  @@map("users")
 }
