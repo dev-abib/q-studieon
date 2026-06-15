@@ -1,0 +1,11 @@
+enum AnswerOption {
+  yes
+  no
+  not_sure
+}
+
+model Question {
+  id      String         @id @default(cuid())
+  text    String
+  options AnswerOption[]
+}
