@@ -5,7 +5,10 @@ enum AnswerOption {
 }
 
 model Question {
-  id      String         @id @default(cuid())
-  text    String
-  options AnswerOption[]
+  id        String         @id @default(cuid())
+  text      String
+  options   AnswerOption[]
+  slug      String         @unique
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 }
