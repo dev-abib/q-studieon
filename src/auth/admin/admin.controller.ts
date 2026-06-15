@@ -71,6 +71,7 @@ export class AdminController {
   }
 
   // log out controller
+  // log out controller
   @Post('log-out')
   @HttpCode(200)
   @Auth('admin')
@@ -81,8 +82,9 @@ export class AdminController {
   ) {
     await this.adminService.logOut(user.id);
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    CookieHelper.clearAdminAuthCookies(res);
+
+    return { message: 'Logged out successfully' };
   }
 
   // change password controller
