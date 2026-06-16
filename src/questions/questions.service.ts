@@ -8,12 +8,25 @@ import { GetAllQuestionsDto } from './dto/get-all-questions.dto';
 export class QuestionsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // helper: slugify a string
+  private slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[\s]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
   // create question service
   async createQuestion(dto: CreateQuestionDto) {
+    const slug = dto.slug ?? this.slugify(dto.text);
+
     const question = await this.prisma.question.create({
       data: {
         text: dto.text,
-        slug: dto.slug,
+        slug,
         options: dto.options,
       },
     });

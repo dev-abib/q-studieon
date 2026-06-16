@@ -3,6 +3,6 @@ model Question {
   text      String
   options   String[]
   createdAt DateTime       @default(now())
-  slug      String         @unique
+  slug      String
   updatedAt DateTime       @updatedAt
 }

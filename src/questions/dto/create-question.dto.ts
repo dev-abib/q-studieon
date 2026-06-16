@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsArray, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray, MinLength, IsOptional } from 'class-validator';
 
 export class CreateQuestionDto {
   @IsString()
@@ -7,8 +7,8 @@ export class CreateQuestionDto {
   text: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Slug is required' })
-  slug: string;
+  @IsOptional()
+  slug?: string;
 
   @IsArray()
   @IsString({ each: true, message: 'Each option must be a string' })
