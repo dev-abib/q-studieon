@@ -29,7 +29,7 @@ export class OnsiteReportController {
     return this.onsiteReportService.getMyReports(user.id);
   }
 
-  @Post('collections')
+  @Post('create-collection')
   @Auth('user')
   createCollection(
     @Body() dto: CreateCollectionDto,
@@ -38,13 +38,13 @@ export class OnsiteReportController {
     return this.onsiteReportService.createCollection(dto, user.id);
   }
 
-  @Get('collections')
+  @Get('get-all-collections')
   @Auth('user')
   getMyCollections(@CurrentUser() user: JwtPayload) {
     return this.onsiteReportService.getCollections(user.id);
   }
 
-  @Post('collections/:collectionId/add')
+  @Post('add-report-to-collection/:collectionId')
   @Auth('user')
   addToCollection(
     @Param('collectionId') collectionId: string,
