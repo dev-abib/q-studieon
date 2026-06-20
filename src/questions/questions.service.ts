@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -8,26 +8,25 @@ import { GetAllQuestionsDto } from './dto/get-all-questions.dto';
 export class QuestionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // helper: slugify a string
-  private slugify(text: string): string {
-    return text
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/[\s]+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
   // create question service
   async createQuestion(dto: CreateQuestionDto) {
-    const slug = dto.slug ?? this.slugify(dto.text);
+    // Verify the category exists
+    const category = await this.prisma.category.findUnique({
+      where: { id: dto.categoryId },
+    });
+
+    if (!category) {
+      throw new BadRequestException('Category not found');
+    }
 
     const question = await this.prisma.question.create({
       data: {
         text: dto.text,
-        slug,
         options: dto.options,
+        categoryId: dto.categoryId,
+      },
+      include: {
+        category: true,
       },
     });
 
@@ -43,6 +42,9 @@ export class QuestionsService {
   async getQuestionById(id: string) {
     const question = await this.prisma.question.findUnique({
       where: { id },
+      include: {
+        category: true,
+      },
     });
 
     if (!question) {
@@ -57,22 +59,7 @@ export class QuestionsService {
     };
   }
 
-  // get questions by slug service (returns ALL questions with that slug)
-  async getQuestionsBySlug(slug: string) {
-    const questions = await this.prisma.question.findMany({
-      where: { slug },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    return {
-      message: 'Questions retrieved successfully',
-      data: {
-        questions,
-      },
-    };
-  }
-
-  // get all questions with pagination service
+  // get all questions with pagination and optional category filter
   async getAllQuestions(dto: GetAllQuestionsDto) {
     const {
       page = 1,
@@ -80,18 +67,22 @@ export class QuestionsService {
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
+      categoryId,
     } = dto;
 
     const skip = (page - 1) * limit;
 
-    const where = search
-      ? {
-          OR: [
-            { text: { contains: search, mode: 'insensitive' as const } },
-            { slug: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { text: { contains: search, mode: 'insensitive' as const } },
+      ];
+    }
+
+    if (categoryId) {
+      where.categoryId = categoryId;
+    }
 
     const [total, questions] = await Promise.all([
       this.prisma.question.count({ where }),
@@ -100,6 +91,9 @@ export class QuestionsService {
         orderBy: { [sortBy]: sortOrder },
         skip,
         take: limit,
+        include: {
+          category: true,
+        },
       }),
     ]);
 
@@ -131,12 +125,26 @@ export class QuestionsService {
       throw new NotFoundException('Question not found');
     }
 
+    // If categoryId is being updated, verify the category exists
+    if (dto.categoryId) {
+      const category = await this.prisma.category.findUnique({
+        where: { id: dto.categoryId },
+      });
+
+      if (!category) {
+        throw new BadRequestException('Category not found');
+      }
+    }
+
     const question = await this.prisma.question.update({
       where: { id },
       data: {
         ...(dto.text !== undefined && { text: dto.text }),
-        ...(dto.slug !== undefined && { slug: dto.slug }),
         ...(dto.options !== undefined && { options: dto.options }),
+        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
+      },
+      include: {
+        category: true,
       },
     });
 

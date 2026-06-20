@@ -29,7 +29,7 @@ export class QuestionsController {
   // create question controller
   @Post('create-questions')
   @Auth('admin')
-  @ApiOperation({ summary: 'Create a new question' })
+  @ApiOperation({ summary: 'Create a new question (requires categoryId)' })
   createQuestion(@Body() dto: CreateQuestionDto) {
     return this.questionsService.createQuestion(dto);
   }
@@ -37,18 +37,9 @@ export class QuestionsController {
   // get all questions controller (literal path before :id)
   @Get('get-all-questions')
   @Auth('admin')
-  @ApiOperation({ summary: 'Get all questions with pagination' })
+  @ApiOperation({ summary: 'Get all questions with pagination & optional categoryId filter' })
   getAllQuestions(@Query() dto: GetAllQuestionsDto) {
     return this.questionsService.getAllQuestions(dto);
-  }
-
-  // get questions by slug controller (literal+param path before bare :id)
-  @Get('by-slug/:slug')
-  @Auth('admin')
-  @ApiOperation({ summary: 'Get a question by slug' })
-  @ApiParam({ name: 'slug', description: 'Question slug' })
-  getQuestionsBySlug(@Param('slug') slug: string) {
-    return this.questionsService.getQuestionsBySlug(slug);
   }
 
   // get question by ID controller

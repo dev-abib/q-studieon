@@ -9,14 +9,14 @@ export class UpdateQuestionDto {
   @IsOptional()
   text?: string;
 
-  @ApiPropertyOptional({ example: 'favorite-color', description: 'Unique slug' })
-  @IsString()
-  @IsOptional()
-  slug?: string;
-
   @ApiPropertyOptional({ example: ['Red', 'Blue', 'Green'], description: 'List of answer options', isArray: true })
   @IsArray()
   @IsString({ each: true, message: 'Each option must be a string' })
   @IsOptional()
   options?: string[];
+
+  @ApiPropertyOptional({ example: 'category-id-here', description: 'Category ID the question belongs to' })
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
 }
