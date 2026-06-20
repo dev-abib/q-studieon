@@ -10,8 +10,12 @@ export class AppController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Health check', description: 'Returns a simple health check message' })
-  getHello(): string {
-    return this.appService.getHello();
+  @ApiOperation({ summary: 'System health check', description: 'Returns full system status including server info, database connectivity, and environment details' })
+  async getSystemStatus() {
+    const status = await this.appService.getSystemStatus();
+    return {
+      data: status,
+      message: 'System health check',
+    };
   }
 }

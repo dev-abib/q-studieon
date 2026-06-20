@@ -36,7 +36,7 @@ async function bootstrap() {
 
   app.set('trust proxy', 1);
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', { exclude: ['api/docs', 'api/docs/(.*)'] });
 
   app.useGlobalPipes(
     new ValidationPipe({
