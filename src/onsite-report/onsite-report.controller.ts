@@ -1,4 +1,5 @@
 import { Controller, Body, Post, Get, Param } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { OnsiteReportService } from './onsite-report.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt.types';
@@ -9,6 +10,7 @@ import {
   CreateCollectionDto,
 } from './helpers/dto/collection.dto';
 
+@ApiExcludeController()
 @Controller('onsite-report')
 export class OnsiteReportController {
   constructor(private readonly onsiteReportService: OnsiteReportService) {}

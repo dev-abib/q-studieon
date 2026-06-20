@@ -9,6 +9,11 @@ import {
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Auth } from '../auth/decorators/auth.decorator';
@@ -22,6 +27,8 @@ import {
 } from '../common/pipes/file-validation.pipe';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 
+@ApiTags('User')
+@ApiBearerAuth()
 @Controller('user')
 export class UserController {
   constructor(private readonly user: UserService) {}
@@ -30,6 +37,7 @@ export class UserController {
   @Get('get-me')
   @HttpCode(200)
   @Auth('user')
+  @ApiOperation({ summary: 'Get current user profile' })
   getMe(@CurrentUser() user: JwtPayload) {
     return this.user.getMe(user.id);
   }
@@ -39,6 +47,7 @@ export class UserController {
   @HttpCode(200)
   @Auth('user')
   @NoGuest()
+  @ApiOperation({ summary: 'Update user profile with optional profile picture' })
   @UseInterceptors(createFileUploadInterceptor({ fieldName: 'profilePicture' }))
   updateUser(
     @Body() dto: UpdateUserDto,
@@ -62,6 +71,7 @@ export class UserController {
   @HttpCode(204)
   @Auth('user')
   @NoGuest()
+  @ApiOperation({ summary: 'Delete user account' })
   deleteUser(@Body() dto: DeleteAccountDto, @CurrentUser() user: JwtPayload) {
     return this.user.deleteUser(dto, user.id);
   }

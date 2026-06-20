@@ -8,6 +8,12 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { Public } from '../decorators/public.decorator';
 import { AdminLoginDto } from '../dto/admin-login.dto';
@@ -18,6 +24,7 @@ import { CurrentUser } from '../decorators/current-user.decorator';
 import type { JwtPayload } from '../types/jwt.types';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 
+@ApiTags('Auth - Admin')
 @Controller('auth/admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -25,6 +32,7 @@ export class AdminController {
   // login admin controller
   @Post('login')
   @Public()
+  @ApiOperation({ summary: 'Admin login' })
   async loginAdmin(
     @Body() dto: AdminLoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -46,6 +54,7 @@ export class AdminController {
   //  admin refresh token controller
   @Post('refresh-token')
   @Public()
+  @ApiOperation({ summary: 'Refresh admin access token' })
   async refreshToken(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -71,10 +80,11 @@ export class AdminController {
   }
 
   // log out controller
-  // log out controller
   @Post('log-out')
   @HttpCode(200)
   @Auth('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin logout' })
   async logOut(
     @CurrentUser() user: JwtPayload,
     @Req() req: Request,
@@ -91,6 +101,8 @@ export class AdminController {
   @Put('change-password')
   @HttpCode(200)
   @Auth('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change admin password' })
   async changePassword(
     @Body() dto: ChangePasswordDto,
     @CurrentUser() user: JwtPayload,

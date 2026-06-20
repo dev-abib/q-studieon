@@ -5,6 +5,7 @@ import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import helmet from 'helmet';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
@@ -46,6 +47,17 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
+
+  // Swagger configuration
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Q-Studieon API')
+    .setDescription('API documentation for Q-Studieon')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
   console.log(

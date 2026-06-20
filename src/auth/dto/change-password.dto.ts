@@ -1,7 +1,14 @@
 import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { Match } from '../decorators/match.decorator';
 
 export class ChangePasswordDto {
+  @ApiProperty({
+    example: 'OldP@ss1',
+    description: 'Current password',
+    minLength: 8,
+    maxLength: 32,
+  })
   @IsString()
   @MinLength(8)
   @MaxLength(32)
@@ -11,6 +18,12 @@ export class ChangePasswordDto {
   })
   oldPassword: string;
 
+  @ApiProperty({
+    example: 'NewStrongP@ss1',
+    description: 'New password',
+    minLength: 8,
+    maxLength: 32,
+  })
   @IsString()
   @MinLength(8)
   @MaxLength(32)
@@ -20,6 +33,7 @@ export class ChangePasswordDto {
   })
   password: string;
 
+  @ApiProperty({ example: 'NewStrongP@ss1', description: 'Must match the new password' })
   @IsString()
   @Match('password', { message: 'Passwords do not match' })
   confirmPassword: string;

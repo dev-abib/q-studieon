@@ -1,4 +1,9 @@
 import { Body, Controller, Headers, HttpCode, Ip, Post } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -12,6 +17,7 @@ import { ChangePasswordDto } from '../dto/change-password.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { UserService } from './user.service';
 
+@ApiTags('Auth - User')
 @Controller('auth/user')
 export class UserController {
   constructor(private readonly authService: UserService) {}
@@ -20,6 +26,7 @@ export class UserController {
   @Post('register')
   @HttpCode(201)
   @Public()
+  @ApiOperation({ summary: 'Register a new user' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -28,6 +35,7 @@ export class UserController {
   @Post('login')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'User login' })
   login(@Body() dto: LoginDto) {
     return this.authService.loginAccount(dto);
   }
@@ -36,6 +44,7 @@ export class UserController {
   @Post('verify-account')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Verify user account with OTP' })
   verifyAccount(@Body() dto: VerifyAccountDto) {
     return this.authService.verifyAccount(dto);
   }
@@ -44,6 +53,7 @@ export class UserController {
   @Post('resend-otp')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Resend OTP verification code' })
   resendOtp(@Body() dto: ResendOtpDto) {
     return this.authService.resendOtp(dto);
   }
@@ -52,6 +62,7 @@ export class UserController {
   @Post('forgot-password')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Request password reset (sends OTP)' })
   forgotPassword(@Body() dto: ResendOtpDto) {
     return this.authService.forgotPassword(dto);
   }
@@ -60,6 +71,7 @@ export class UserController {
   @Post('verify-otp')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Verify OTP for password reset' })
   verifyOtp(@Body() dto: VerifyAccountDto) {
     return this.authService.verifyOtp(dto);
   }
@@ -68,6 +80,8 @@ export class UserController {
   @Post('reset-password')
   @HttpCode(200)
   @Auth('reset')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reset password (requires reset token)' })
   resetPassword(
     @Body() dto: ResetPasswordDto,
     @CurrentUser() user: JwtPayload,
@@ -79,6 +93,8 @@ export class UserController {
   @Post('change-password')
   @HttpCode(200)
   @Auth('user')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change user password (authenticated)' })
   changePassword(
     @Body() dto: ChangePasswordDto,
     @CurrentUser() user: JwtPayload,
@@ -90,6 +106,7 @@ export class UserController {
   @Post('guest-login')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Login as a guest user' })
   guestLogin(@Ip() ip: string, @Headers('x-device-id') deviceId: string) {
     return this.authService.guestLogin(ip, deviceId);
   }
@@ -98,6 +115,7 @@ export class UserController {
   @Post('google-login')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Login with Google OAuth' })
   googleLogin(@Body('token') token: string) {
     return this.authService.googleLogin(token);
   }
@@ -106,6 +124,7 @@ export class UserController {
   @Post('apple-login')
   @HttpCode(200)
   @Public()
+  @ApiOperation({ summary: 'Login with Apple OAuth' })
   appleLogin(@Body('token') token: string) {
     return this.authService.appleLogin(token);
   }
@@ -114,6 +133,8 @@ export class UserController {
   @Post('log-out')
   @HttpCode(200)
   @Auth('user')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'User logout' })
   logOut(@CurrentUser() user: JwtPayload) {
     return this.authService.logOut(user.id);
   }
@@ -121,6 +142,7 @@ export class UserController {
   // refresh token controller
   @Post('refresh-token')
   @Public()
+  @ApiOperation({ summary: 'Refresh user access token' })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refreshToken);
   }
