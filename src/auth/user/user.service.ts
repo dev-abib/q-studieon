@@ -82,10 +82,15 @@ export class UserService {
         },
       );
       return res.data;
-    } catch (error) {
-      console.log(error);
+    } catch (error: any) {
+      console.error('Google token verification failed:', error?.response?.data || error?.message || error);
+      if (error?.response?.status === 401) {
+        throw new UnauthorizedException(
+          'Invalid or expired Google token. Please obtain a new one from the Google OAuth flow.',
+        );
+      }
       throw new InternalServerErrorException(
-        `Something went wrong, can't login at the moment `,
+        `Something went wrong, can't login at the moment`,
       );
     }
   }
@@ -105,10 +110,15 @@ export class UserService {
         email: res.email ?? '',
         email_verified: res.email_verified === 'true',
       };
-    } catch (error) {
-      console.log(error);
+    } catch (error: any) {
+      console.error('Apple token verification failed:', error?.message || error);
+      if (error?.message?.includes('expired') || error?.message?.includes('invalid')) {
+        throw new UnauthorizedException(
+          'Invalid or expired Apple identity token.',
+        );
+      }
       throw new InternalServerErrorException(
-        ` Something went wrong, can't login at the moment `,
+        `Something went wrong, can't login at the moment`,
       );
     }
   }
@@ -717,7 +727,7 @@ export class UserService {
     });
 
     return {
-      message: 'Google log in successfull',
+      message: 'Google login successful',
       data: {
         token: {
           accessToken,
@@ -788,7 +798,7 @@ export class UserService {
     });
 
     return {
-      message: 'Google log in successfull',
+      message: 'Apple login successful',
       data: {
         token: {
           accessToken,

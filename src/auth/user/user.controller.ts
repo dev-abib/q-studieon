@@ -1,8 +1,9 @@
-import { Body, Controller, Headers, HttpCode, Ip, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, Ip, Post, BadRequestException } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
+  ApiBody,
 } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 import { RegisterDto } from '../dto/register.dto';
@@ -116,7 +117,21 @@ export class UserController {
   @HttpCode(200)
   @Public()
   @ApiOperation({ summary: 'Login with Google OAuth' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Google OAuth access token obtained from the Google OAuth frontend flow',
+          example: 'ya29.a0AeO...',
+        },
+      },
+      required: ['token'],
+    },
+  })
   googleLogin(@Body('token') token: string) {
+    if (!token) throw new BadRequestException('Google token is required');
     return this.authService.googleLogin(token);
   }
 
@@ -125,7 +140,21 @@ export class UserController {
   @HttpCode(200)
   @Public()
   @ApiOperation({ summary: 'Login with Apple OAuth' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Apple identity token obtained from the Apple Sign-In frontend flow',
+          example: 'eyJraWQiOi...',
+        },
+      },
+      required: ['token'],
+    },
+  })
   appleLogin(@Body('token') token: string) {
+    if (!token) throw new BadRequestException('Apple token is required');
     return this.authService.appleLogin(token);
   }
 
