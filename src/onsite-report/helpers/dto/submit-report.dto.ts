@@ -3,31 +3,33 @@ import {
   IsNotEmpty,
   IsNumber,
   IsArray,
-  IsOptional,
   ValidateNested,
   ArrayMinSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { AddCaptureDto } from './add.capture.dto';
+import { Type, Transform } from 'class-transformer';
+import { LevelDto } from './level.dto';
 
 export class SubmitOnsiteReportDto {
   @IsString()
   @IsNotEmpty()
-  address: string;
+  address!: string;
 
+  @Transform(({ value }) => Number(value))
   @IsNumber()
-  latitude: number;
+  latitude!: number;
 
+  @Transform(({ value }) => Number(value))
   @IsNumber()
-  longitude: number;
+  longitude!: number;
 
-  @IsString()
-  @IsOptional()
-  notes?: string;
-
+  @Transform(({ value }) => {
+    const parsed: unknown =
+      typeof value === 'string' ? JSON.parse(value) : value;
+    return parsed as LevelDto[];
+  })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => AddCaptureDto)
-  captures: AddCaptureDto[];
+  @Type(() => LevelDto)
+  levels!: LevelDto[];
 }

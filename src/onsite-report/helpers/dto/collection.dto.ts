@@ -3,7 +3,7 @@ import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 export class CreateCollectionDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsOptional()
@@ -13,5 +13,5 @@ export class CreateCollectionDto {
 export class AddReportToCollectionDto {
   @IsString()
   @IsNotEmpty()
-  reportId: string;
+  reportId!: string;
 }
