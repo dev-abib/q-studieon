@@ -5,13 +5,17 @@ import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import helmet from 'helmet';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { setupSwagger } from './common/swagger/swagger.setup';
+import { join } from 'path';
 import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+
+  // Serve static assets (favicon, etc.)
+  app.useStaticAssets(join(__dirname, '..', 'public'));
 
   app.use(helmet());
   app.use(cookieParser());
@@ -49,15 +53,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor(new Reflector()));
 
   // Swagger configuration
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Q-Studieon API')
-    .setDescription('API documentation for Q-Studieon')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  setupSwagger(app);
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
   console.log(
