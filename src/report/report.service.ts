@@ -13,7 +13,8 @@ import type {
   AiResponse,
   CreateReportResponse,
 } from './types/report.types';
-import { UserRepository } from '../common/repositories/user.repository';
+import { getAccessLevel, buildReportResponse } from '../auth/helpers/report-response.helper';
+import type { JwtPayload } from '../auth/types/jwt.types';
 
 @Injectable()
 export class ReportService {
@@ -22,13 +23,12 @@ export class ReportService {
     private readonly placeDetailsHelper: PlaceDetailsHelper,
     private readonly numerologyHelpers: NumerologyHelpers,
     private readonly aiHelper: AiHelper,
-    private readonly userRepo: UserRepository,
   ) {}
 
   async createReport(
     dto: CreateReportDto,
-    userId: string,
-  ): Promise<CreateReportResponse<{ saved: Report }>> {
+    user: JwtPayload,
+  ): Promise<CreateReportResponse> {
     const placeDetails = await this.placeDetailsHelper.getPlacePhotos({
       lat: dto.latitude,
       lng: dto.longitude,
@@ -44,6 +44,7 @@ export class ReportService {
 
     const numerologyDetails = this.numerologyHelpers.createReport(dto);
 
+    // Always generate full report for DB storage
     const aiResponse = (await this.aiHelper.generateByAccessLevel(
       ReportAccessLevel.PAID_FULL,
       {
@@ -59,7 +60,7 @@ export class ReportService {
 
     const saved = await this.prisma.report.create({
       data: {
-        userId,
+        userId: user.id,
         type: 'property_report',
         status: 'completed',
 
@@ -97,10 +98,13 @@ export class ReportService {
       },
     });
 
+    // Build response based on user's access level
+    const accessLevel = getAccessLevel(user);
+
     return {
       success: true,
       message: 'Home alignment report generated successfully',
-      data: { saved },
+      data: buildReportResponse(saved, accessLevel),
     };
   }
 

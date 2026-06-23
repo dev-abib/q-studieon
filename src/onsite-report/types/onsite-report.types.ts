@@ -22,7 +22,8 @@ export interface OnsiteReportMetadata {
   mainEntranceType: string;
   mainCardinal: string;
   mainBearing: number;
-  capturesTotal: number;
+  totalLevels: number;
+  totalCaptures: number;
   captures: OnsiteCaptureData[];
 }
 
@@ -43,10 +44,18 @@ export type ReportListItem = Prisma.ReportGetPayload<{
 
 // ── Response shapes ───────────────────────────────────────────────────────────
 
+export interface OnsiteReportData {
+  report: Report | Record<string, unknown>;
+  accessLevel: 'paid_full' | 'free_preview' | 'guest_preview';
+  totalLevels: number;
+  totalCaptures: number;
+  captures: OnsiteCaptureData[];
+}
+
 export interface SubmitReportResponse {
   success: boolean;
   message: string;
-  data: Report;
+  data: OnsiteReportData;
 }
 
 export interface GetReportsResponse {
@@ -56,5 +65,5 @@ export interface GetReportsResponse {
 
 export interface GetReportResponse {
   success: boolean;
-  data: Prisma.ReportGetPayload<Record<string, never>>;
+  data: OnsiteReportData;
 }

@@ -1,9 +1,10 @@
+import crypto from 'crypto';
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, Report } from '@prisma/client';
 import { OnsiteAiHelper } from './helpers/onsite-ai-helper';
 import {
   OnsiteCaptureData,
@@ -19,9 +20,47 @@ import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
 import { SubmitOnsiteReportDto } from './helpers/dto/submit-report.dto';
 import { CreateCollectionDto } from './helpers/dto/collection.dto';
+import { CaptureType } from './helpers/dto/add.capture.dto';
+import { CloudinaryService } from '../common/services/cloudinary.service';
+import {
+  getAccessLevel,
+  buildReportResponse,
+} from '../auth/helpers/report-response.helper';
+import { ReportAccessLevel } from '../auth/helpers/ai-helper';
+import type { JwtPayload } from '../auth/types/jwt.types';
+import type { MulterFile } from '../common/pipes/file-validation.pipe';
 
 function toJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
+}
+
+function safeNumber(val: unknown, fallback = 0): number {
+  return typeof val === 'number' ? val : fallback;
+}
+
+function safeCaptureArray(val: unknown): OnsiteCaptureData[] {
+  if (!Array.isArray(val)) return [];
+  // Basic shape check — each item must have an id
+  return val.filter(
+    (item): item is OnsiteCaptureData =>
+      item !== null && typeof item === 'object' && 'id' in item,
+  );
+}
+
+function extractOnsiteMeta(metadata: unknown): {
+  totalLevels: number;
+  totalCaptures: number;
+  captures: OnsiteCaptureData[];
+} {
+  if (!metadata || typeof metadata !== 'object') {
+    return { totalLevels: 0, totalCaptures: 0, captures: [] };
+  }
+  const m = metadata as Record<string, unknown>;
+  return {
+    totalLevels: safeNumber(m.totalLevels),
+    totalCaptures: safeNumber(m.totalCaptures),
+    captures: safeCaptureArray(m.captures),
+  };
 }
 
 @Injectable()
@@ -31,58 +70,100 @@ export class OnsiteReportService {
     private readonly numerologyHelpers: NumerologyHelpers,
     private readonly placeDetailsHelper: PlaceDetailsHelper,
     private readonly onsiteAiHelper: OnsiteAiHelper,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
   // ---------------------------------------------------------------------------
   // POST /onsite-report/submit
-  // Receives all captures at once, runs AI, persists one Report row.
   // ---------------------------------------------------------------------------
 
   async submitReport(
     dto: SubmitOnsiteReportDto,
-    userId: string,
+    user: JwtPayload,
+    files?: MulterFile[],
   ): Promise<SubmitReportResponse> {
-    // ── Validate captures ────────────────────────────────────────────────────
+    // ── Flatten levels → elements → captures ─────────────────────────────────
 
-    const mainEntrances = dto.captures.filter((c) => c.isMainEntrance);
-    if (mainEntrances.length > 1) {
+    const allElements = dto.levels.flatMap((level) =>
+      level.elements.map((element) => ({
+        ...element,
+        levelName: level.levelName,
+        levelNumber: level.levelNumber,
+      })),
+    );
+
+    if (!allElements.length) {
+      throw new BadRequestException('At least one element is required.');
+    }
+
+    // ── Validate: only one front_entrance ────────────────────────────────────
+
+    const mainElements = allElements.filter(
+      (e) => e.categorySlug === 'front_entrance',
+    );
+    if (mainElements.length > 1) {
       throw new BadRequestException(
-        'Only one capture can be marked as the main entrance.',
+        'Only one element can be marked as the front entrance.',
       );
     }
 
-    // ── Resolve main entrance: explicit flag → first capture ─────────────────
+    // ── Resolve main element ─────────────────────────────────────────────────
 
-    const mainCapture = mainEntrances[0] ?? dto.captures[0];
+    const mainElement = mainElements[0] ?? allElements[0];
 
-    // ── Build typed captures with cardinal resolved ───────────────────────────
-    // No cast needed — captureType is already CaptureType from the DTO
+    // ── Build typed captures ─────────────────────────────────────────────────
 
-    const typedCaptures: OnsiteCaptureData[] = dto.captures.map((c) => ({
+    const typedCaptures: OnsiteCaptureData[] = allElements.map((e) => ({
       id: crypto.randomUUID(),
-      captureType: c.captureType,
-      bearingDegrees: c.bearingDegrees,
-      cardinal: this.onsiteAiHelper.getCardinalFromBearing(c.bearingDegrees),
-      isMainEntrance: c.isMainEntrance ?? false,
-      notes: c.notes ?? null,
+      captureType: e.categorySlug as CaptureType,
+      bearingDegrees: e.bearingDegrees,
+      cardinal: this.onsiteAiHelper.getCardinalFromBearing(e.bearingDegrees),
+      isMainEntrance: e.categorySlug === 'front_entrance',
+      notes: e.notes ?? null,
       createdAt: new Date(),
     }));
 
     const mainCardinal = this.onsiteAiHelper.getCardinalFromBearing(
-      mainCapture.bearingDegrees,
+      mainElement.bearingDegrees,
     );
 
-    // ── Numerology ────────────────────────────────────────────────────────────
+    // ── Numerology ───────────────────────────────────────────────────────────
 
     const numerologyDetails = this.numerologyHelpers.createReport({
       address: dto.address,
       latitude: dto.latitude,
       longitude: dto.longitude,
-      entranceDegrees: mainCapture.bearingDegrees,
+      entranceDegrees: mainElement.bearingDegrees,
       entranceLabel: mainCardinal,
     });
 
-    // ── Place photos ──────────────────────────────────────────────────────────
+    // ── Validate and upload photos to Cloudinary ────────────────────────────
+
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const maxSize = 10 * 1024 * 1024; // 10 MB
+
+    let uploadedPhotos: { url: string; publicId: string }[] = [];
+    if (files && files.length > 0) {
+      // Validate each file
+      for (const file of files) {
+        if (!allowedMimes.includes(file.mimetype)) {
+          throw new BadRequestException(
+            `Invalid file type: ${file.mimetype}. Allowed: ${allowedMimes.join(', ')}`,
+          );
+        }
+        if (file.size > maxSize) {
+          throw new BadRequestException(
+            `File ${file.originalname} exceeds 10MB limit`,
+          );
+        }
+      }
+
+      uploadedPhotos = await Promise.all(
+        files.map((file) => this.cloudinary.uploadFile(file, 'onsite-reports')),
+      );
+    }
+
+    // ── Place photos (Google Maps) ───────────────────────────────────────────
 
     const placeDetails = await this.placeDetailsHelper.getPlacePhotos({
       lat: dto.latitude,
@@ -90,51 +171,51 @@ export class OnsiteReportService {
     });
 
     const placeId = placeDetails?.[0]?.place_id ?? null;
-    const photos = [
+    const googlePhotos = [
       placeDetails?.[0]?.photos?.[0],
       placeDetails?.[0]?.photos?.[1],
     ].filter(Boolean);
 
-    // ── AI generation ─────────────────────────────────────────────────────────
+    // ── AI generation ────────────────────────────────────────────────────────
 
     const aiResponse = await this.onsiteAiHelper.generateOnsiteReport({
       address: dto.address,
       numerologyDetails,
-      entranceBearing: mainCapture.bearingDegrees,
-      userConfirmedDirection: true, // always true for on-site
+      entranceBearing: mainElement.bearingDegrees,
+      userConfirmedDirection: true,
       captures: typedCaptures,
     });
 
     const report = aiResponse.data;
     const aiMeta = aiResponse.metadata;
 
-    // ── Build metadata with a typed interface — no `as unknown` needed ────────
+    // ── Build metadata ───────────────────────────────────────────────────────
+
+    const totalLevels = dto.levels.length;
+    const totalCaptures = typedCaptures.length;
 
     const metadata: OnsiteReportMetadata = {
       reportMode: 'onsite',
       address: dto.address,
-      notes: dto.notes ?? null,
-      mainEntranceType: mainCapture.captureType,
+      notes: null,
+      mainEntranceType: mainElement.categorySlug,
       mainCardinal,
-      mainBearing: mainCapture.bearingDegrees,
-      capturesTotal: typedCaptures.length,
+      mainBearing: mainElement.bearingDegrees,
+      totalLevels,
+      totalCaptures,
       captures: typedCaptures,
     };
 
     // ── Persist ───────────────────────────────────────────────────────────────
-    // toJson() performs a single, explicit boundary cast at the Prisma layer.
-    // Everything above this point is fully typed.
-    // photos, practicalRemedies, helpfulTips are stored as flat arrays —
-    // consistent with how the remote ReportService stores them.
 
     const saved = await this.prisma.report.create({
       data: {
-        userId,
+        userId: user.id,
         type: 'onsite_property_report',
         status: 'completed',
 
         placeId,
-        photos: toJson(photos),
+        photos: toJson([...googlePhotos, ...uploadedPhotos]),
 
         overallAlignmentSummary: report.overall_alignment_summary,
         overview: report.overview,
@@ -164,16 +245,30 @@ export class OnsiteReportService {
       },
     });
 
+    // ── Build response based on access level ─────────────────────────────────
+
+    const accessLevel = getAccessLevel(user);
+    const { report: reportData, accessLevel: accessLvl } = buildReportResponse(
+      saved,
+      accessLevel,
+    );
+    const isPaid = accessLevel === ReportAccessLevel.PAID_FULL;
+
     return {
       success: true,
       message: 'On-site report generated successfully.',
-      data: saved,
+      data: {
+        report: reportData,
+        accessLevel: accessLvl,
+        totalLevels: isPaid ? totalLevels : 0,
+        totalCaptures: isPaid ? totalCaptures : 0,
+        captures: isPaid ? typedCaptures : [],
+      },
     };
   }
 
   // ---------------------------------------------------------------------------
   // GET /onsite-report/my-reports
-  // Lightweight list — no heavy JSON blobs.
   // ---------------------------------------------------------------------------
 
   async getMyReports(userId: string): Promise<GetReportsResponse> {
@@ -188,26 +283,41 @@ export class OnsiteReportService {
 
   // ---------------------------------------------------------------------------
   // GET /onsite-report/:reportId
-  // Full report row.
   // ---------------------------------------------------------------------------
 
   async getReportById(
     reportId: string,
-    userId: string,
+    user: JwtPayload,
   ): Promise<GetReportResponse> {
     const data = await this.prisma.report.findFirst({
-      where: { id: reportId, userId, type: 'onsite_property_report' },
+      where: { id: reportId, userId: user.id, type: 'onsite_property_report' },
     });
 
     if (!data) throw new NotFoundException('Report not found.');
 
-    return { success: true, data };
+    const accessLevel = getAccessLevel(user);
+    const meta = extractOnsiteMeta(data.metadata);
+    const { report: reportData, accessLevel: accessLvl } = buildReportResponse(
+      data,
+      accessLevel,
+    );
+    const isPaid = accessLevel === ReportAccessLevel.PAID_FULL;
+
+    return {
+      success: true,
+      data: {
+        report: reportData,
+        accessLevel: accessLvl,
+        totalLevels: isPaid ? meta.totalLevels : 0,
+        totalCaptures: isPaid ? meta.totalCaptures : 0,
+        captures: isPaid ? meta.captures : [],
+      },
+    };
   }
 
   async createCollection(dto: CreateCollectionDto, userId: string) {
     const name = dto.name.trim();
 
-    // Check duplicate name
     const existing = await this.prisma.collection.findUnique({
       where: {
         userId_name: { userId, name },
@@ -258,7 +368,6 @@ export class OnsiteReportService {
     reportId: string,
     userId: string,
   ) {
-    // Check report ownership
     const report = await this.prisma.report.findFirst({
       where: { id: reportId },
     });
@@ -267,7 +376,6 @@ export class OnsiteReportService {
       throw new NotFoundException('Report not found or access denied');
     }
 
-    // Check collection ownership
     const collection = await this.prisma.collection.findFirst({
       where: { id: collectionId, userId },
     });
@@ -276,7 +384,6 @@ export class OnsiteReportService {
       throw new NotFoundException('Collection not found or access denied');
     }
 
-    // Check if already added
     const existing = await this.prisma.reportCollection.findUnique({
       where: {
         reportId_collectionId: { reportId, collectionId },
@@ -291,7 +398,6 @@ export class OnsiteReportService {
       };
     }
 
-    // Add to collection
     const link = await this.prisma.reportCollection.create({
       data: { reportId, collectionId },
     });

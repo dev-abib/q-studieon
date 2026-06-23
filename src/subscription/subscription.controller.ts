@@ -52,6 +52,8 @@ export class SubscriptionController {
   // reactivate subscription controller
   @Post('reactivate')
   @NoGuest()
+  @Auth('user')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Reactivate a cancelled subscription' })
   async reactivate(@CurrentUser() user: JwtPayload) {
     return this.subscriptionService.reactivateSubscription(user.id);

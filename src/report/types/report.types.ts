@@ -4,7 +4,6 @@ export interface AiReport {
   overall_alignment_summary: string;
   overview: string;
 
-  // ✅ entrance direction for UI header (e.g. "275° W")
   entrance_direction: {
     degrees: number;
     cardinal: string;
@@ -21,7 +20,7 @@ export interface AiReport {
   numerology: {
     address_number: number;
     full_address_number: number;
-    theme: string; // ✅ e.g. "Power & Stability"
+    theme: string;
     tags: string[];
     narrative: string;
   };
@@ -86,14 +85,11 @@ export interface AiResponse {
   metadata: AiMetadata;
 }
 
-export interface ApiResponse<T> {
+export interface CreateReportResponse {
   success: boolean;
   message: string;
-  data: T;
-}
-
-export interface CreateReportResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
+  data: {
+    report: Report | Record<string, unknown>;
+    accessLevel: 'paid_full' | 'free_preview' | 'guest_preview';
+  };
 }

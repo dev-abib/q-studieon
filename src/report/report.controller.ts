@@ -14,12 +14,12 @@ export class ReportController {
 
   @Post('create-report')
   @Auth('user')
-  @ApiOperation({ summary: 'Create a new report' })
+  @ApiOperation({ summary: 'Create a new remote property report' })
   async createReportDto(
     @Body() body: CreateReportDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.reportService.createReport(body, user.id);
+    return this.reportService.createReport(body, user);
   }
 
   @Get('get-my-reports')

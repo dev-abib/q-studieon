@@ -5,6 +5,7 @@ import { OnsiteAiHelper } from './helpers/onsite-ai-helper';
 import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
 import { PrismaModule } from '../prisma/prisma.module';
+import { CloudinaryService } from '../common/services/cloudinary.service';
 
 @Module({
   imports: [PrismaModule],
@@ -14,6 +15,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     OnsiteAiHelper,
     NumerologyHelpers,
     PlaceDetailsHelper,
+    CloudinaryService,
   ],
   exports: [OnsiteReportService],
 })

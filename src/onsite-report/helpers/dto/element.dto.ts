@@ -9,7 +9,7 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Transform, plainToInstance } from 'class-transformer';
 import { QuestionAnswerDto } from './qustion-answer.dto';
 
 export class ElementDto {
@@ -20,14 +20,13 @@ export class ElementDto {
   @Transform(({ value }) => {
     if (typeof value === 'string') {
       const parsed: unknown = JSON.parse(value);
-      return parsed as QuestionAnswerDto[];
+      return plainToInstance(QuestionAnswerDto, parsed as object[]);
     }
-    return value as QuestionAnswerDto[];
+    return plainToInstance(QuestionAnswerDto, value as object[]);
   })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => QuestionAnswerDto)
   answers!: QuestionAnswerDto[];
 
   @Transform(({ value }) => Number(value))
