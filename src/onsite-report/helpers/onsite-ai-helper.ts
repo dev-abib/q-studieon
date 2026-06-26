@@ -113,18 +113,12 @@ export class OnsiteAiHelper extends AiHelper {
     this.onsiteOpenai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
 
-  // ── Cardinal from bearing — uses the same 4-point logic as base AiHelper ──
-  // (base class has a private getCardinalDirection; we expose it here for
-  //  capture processing without duplicating the logic differently)
-
   getCardinalFromBearing(bearing: number): string {
     if (bearing >= 315 || bearing < 45) return 'N';
     if (bearing >= 45 && bearing < 135) return 'E';
     if (bearing >= 135 && bearing < 225) return 'S';
     return 'W';
   }
-
-  // ── Analyse each capture into a room energy profile ───────────────────────
 
   private analyzeRoomCaptures(captures: OnsiteCaptureData[]): RoomAnalysis[] {
     return captures.map((c) => {

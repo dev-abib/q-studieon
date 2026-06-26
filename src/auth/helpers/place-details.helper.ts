@@ -56,7 +56,7 @@ export class PlaceDetailsHelper {
 
   async getPlacePhotos(
     latlng: { lat: number; lng: number },
-    maxWidth = 800,
+    maxWidth = 1080,
   ): Promise<PlaceResult[]> {
     const raw: unknown = await this.client.placesNearby({
       params: {
