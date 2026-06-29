@@ -9,11 +9,7 @@ import {
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Auth } from '../auth/decorators/auth.decorator';
@@ -47,7 +43,9 @@ export class UserController {
   @HttpCode(200)
   @Auth('user')
   @NoGuest()
-  @ApiOperation({ summary: 'Update user profile with optional profile picture' })
+  @ApiOperation({
+    summary: 'Update user profile with optional profile picture',
+  })
   @UseInterceptors(createFileUploadInterceptor({ fieldName: 'profilePicture' }))
   updateUser(
     @Body() dto: UpdateUserDto,

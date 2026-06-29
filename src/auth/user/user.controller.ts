@@ -1,10 +1,13 @@
-import { Body, Controller, Headers, HttpCode, Ip, Post, BadRequestException } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiBody,
-} from '@nestjs/swagger';
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  Ip,
+  Post,
+  BadRequestException,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -123,7 +126,8 @@ export class UserController {
       properties: {
         token: {
           type: 'string',
-          description: 'Google OAuth access token obtained from the Google OAuth frontend flow',
+          description:
+            'Google OAuth access token obtained from the Google OAuth frontend flow',
           example: 'ya29.a0AeO...',
         },
       },
@@ -146,7 +150,8 @@ export class UserController {
       properties: {
         token: {
           type: 'string',
-          description: 'Apple identity token obtained from the Apple Sign-In frontend flow',
+          description:
+            'Apple identity token obtained from the Apple Sign-In frontend flow',
           example: 'eyJraWQiOi...',
         },
       },
