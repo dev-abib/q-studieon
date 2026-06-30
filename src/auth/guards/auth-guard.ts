@@ -118,11 +118,14 @@ export class AuthGuard implements CanActivate {
   }
 
   private getSecret(type: AuthType): string {
-    const secret =
-      type === 'user'
-        ? process.env.JWT_ACCESS_SECRET
-        : process.env.JWT_ADMIN_SECRET;
+    const secrets: Record<AuthType, string | undefined> = {
+      user: process.env.JWT_ACCESS_SECRET,
+      admin: process.env.JWT_ADMIN_SECRET,
+      super_admin: process.env.JWT_ADMIN_SECRET,
+      reset: process.env.JWT_RESET_SECRET,
+    };
 
+    const secret = secrets[type];
     if (!secret) {
       throw new UnauthorizedException(`Missing JWT secret for ${type}`);
     }

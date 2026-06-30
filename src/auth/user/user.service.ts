@@ -82,9 +82,16 @@ export class UserService {
         },
       );
       return res.data;
-    } catch (error: any) {
-      console.error('Google token verification failed:', error?.response?.data || error?.message || error);
-      if (error?.response?.status === 401) {
+    } catch (error) {
+      const axiosError = error as {
+        response?: { status: number; data: unknown };
+      };
+      console.error(
+        'Google token verification failed:',
+        axiosError?.response?.data ||
+          (error instanceof Error ? error.message : error),
+      );
+      if (axiosError?.response?.status === 401) {
         throw new UnauthorizedException(
           'Invalid or expired Google token. Please obtain a new one from the Google OAuth flow.',
         );
@@ -111,8 +118,13 @@ export class UserService {
         email_verified: res.email_verified === 'true',
       };
     } catch (error: any) {
-      console.error('Apple token verification failed:', error?.message || error);
-      if (error?.message?.includes('expired') || error?.message?.includes('invalid')) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error('Apple token verification failed:', errorMessage);
+      if (
+        errorMessage?.includes('expired') ||
+        errorMessage?.includes('invalid')
+      ) {
         throw new UnauthorizedException(
           'Invalid or expired Apple identity token.',
         );
@@ -176,25 +188,6 @@ export class UserService {
       });
     }
 
-    const payload = {
-      name: user.name as string,
-      email: user.email as string,
-      id: user.id,
-      isGuest: user.isGuest as boolean,
-      isPaid: user.isPaid as boolean,
-      role: user.role,
-    };
-
-    const accessToken = this.auth.generateToken(payload, 'user', 'access');
-    const refreshToken = this.auth.generateToken(payload, 'user', 'refresh');
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        refreshToken: this.auth.hashToken(refreshToken),
-      },
-    });
-
     let isMailSent: boolean = false;
 
     if (!user.isGuest && user.email) {
@@ -219,10 +212,6 @@ export class UserService {
         profilePicture: user.profilePictureURL,
         id: user.id,
         isGuest: user.isGuest,
-        token: {
-          accessToken,
-          refreshToken,
-        },
       },
     };
   }
@@ -246,6 +235,18 @@ export class UserService {
       throw new BadRequestException('Invalid otp');
     }
 
+    const payload = {
+      name: user.name as string,
+      email: user.email as string,
+      id: user.id,
+      isGuest: user.isGuest as boolean,
+      isPaid: user.isPaid as boolean,
+      role: user.role,
+    };
+
+    const accessToken = this.auth.generateToken(payload, 'user', 'access');
+    const refreshToken = this.auth.generateToken(payload, 'user', 'refresh');
+
     await this.prisma.user.update({
       where: { email: dto.email },
       data: {
@@ -253,6 +254,7 @@ export class UserService {
         otp: null,
         otpExpires: null,
         otpAttempts: 0,
+        refreshToken: this.auth.hashToken(refreshToken),
       },
     });
 
@@ -264,8 +266,24 @@ export class UserService {
       }),
     });
 
+    const data = {
+      name: user.name,
+      email: user.email,
+      profilePicture: user.profilePictureURL,
+      id: user.id,
+      isGuest: user.isGuest,
+    };
+
     return {
       message: 'Email verified successfully',
+
+      data: {
+        token: {
+          accessToken,
+          refreshToken,
+        },
+        user: data,
+      },
     };
   }
 
