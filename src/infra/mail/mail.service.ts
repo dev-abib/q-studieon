@@ -3,21 +3,18 @@ import {
   InternalServerErrorException,
   OnModuleInit,
 } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { SendMailOptions } from './mail.types';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
 
   onModuleInit() {
     const requiredEnv = [
-      'MAIL_HOST',
-      'MAIL_PORT',
-      'MAIL_USERNAME',
-      'MAIL_PASSWORD',
-      'MAIL_FROM_NAME',
-      'MAIL_FROM_ADDRESS',
+      'RESEND_API_KEY',
+      'RESEND_FROM_EMAIL',
+      'RESEND_FROM_NAME',
     ];
 
     requiredEnv.forEach((key) => {
@@ -26,28 +23,23 @@ export class EmailService implements OnModuleInit {
       }
     });
 
-    this.transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST!,
-      port: Number(process.env.MAIL_PORT),
-      secure: Number(process.env.MAIL_PORT) === 465,
-      auth: {
-        user: process.env.MAIL_USERNAME!,
-        pass: process.env.MAIL_PASSWORD!,
-      },
-      connectionTimeout: 10000,
-      debug: false,
-      logger: false,
-    } as nodemailer.TransportOptions);
+    this.resend = new Resend(process.env.RESEND_API_KEY!);
   }
 
   async sendEmail(options: SendMailOptions): Promise<boolean> {
     try {
-      await this.transporter.sendMail({
-        from: `${process.env.MAIL_FROM_NAME as string} <${process.env.MAIL_FROM_ADDRESS as string}>`,
-        to: options.to,
+      const { error } = await this.resend.emails.send({
+        from: `${process.env.RESEND_FROM_NAME as string} <${process.env.RESEND_FROM_EMAIL as string}>`,
+        to: [options.to],
         subject: options.subject,
         html: options.html,
       });
+
+      if (error) {
+        console.error('Email send failed:', error);
+        throw new InternalServerErrorException('Failed to send email');
+      }
+
       return true;
     } catch (error) {
       console.error('Email send failed:', error);
