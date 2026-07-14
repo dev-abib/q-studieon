@@ -138,74 +138,97 @@ export class UserService {
   // services
   // register account service
   async register(dto: RegisterDto) {
-    const isExisting = await this.prisma.user.findFirst({
-      where: {
-        email: dto.email,
-      },
-    });
-
-    if (isExisting) throw new ConflictException('Account already exists');
-
     const otp = this.generateOtp();
     const otpExpiry = this.getOtpExpiry();
     const hashOtp = this.hashOtp(otp);
     const hashPassword = await this.auth.hashPassword(dto.password);
 
-    let user: User;
-
-    if (dto.guestId) {
-      user = await this.prisma.user.update({
-        where: { id: dto.guestId },
-        data: {
-          email: dto.email,
-          name: dto.name,
-          password: hashPassword,
-          authProvider: 'local',
-          otp: hashOtp,
-          otpExpires: otpExpiry,
-          termsAndConditions: dto.termsAndConditions,
-          role: 'user',
-          otpAttempts: 0,
-          isGuest: false,
-          guestIp: null,
-          guestDeviceId: null,
-          guestExpiresAt: null,
-        },
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Check for existing email (atomic with create to prevent race conditions)
+      const isExisting = await tx.user.findFirst({
+        where: { email: dto.email },
       });
-    } else {
-      user = await this.prisma.user.create({
-        data: {
-          email: dto.email,
-          name: dto.name,
-          password: hashPassword,
-          authProvider: 'local',
-          otp: hashOtp,
-          otpExpires: otpExpiry,
-          termsAndConditions: dto.termsAndConditions,
-          role: 'user',
-          otpAttempts: 0,
-        },
-      });
-    }
 
-    let isMailSent: boolean = false;
+      if (isExisting) throw new ConflictException('Account already exists');
 
-    if (!user.isGuest && user.email) {
-      isMailSent = await this.email.sendEmail({
-        to: user.email,
-        subject: `Account verification otp ${process.env.MAIL_FROM_NAME as string}`,
-        html: accountVerificationTemplate({
-          name: user.name as string,
-          email: user.email,
-          otp: otp,
-        }),
-      });
-    }
+      let newUser: User;
 
+      if (dto.guestId) {
+        const guestUser = await tx.user.findUnique({
+          where: { id: dto.guestId },
+        });
+
+        if (!guestUser) {
+          throw new BadRequestException(
+            'Guest session not found or has expired. Please try registering without a guest ID.',
+          );
+        }
+
+        if (!guestUser.isGuest) {
+          throw new BadRequestException('Invalid guest session');
+        }
+
+        newUser = await tx.user.update({
+          where: { id: dto.guestId },
+          data: {
+            email: dto.email,
+            name: dto.name,
+            password: hashPassword,
+            authProvider: 'local',
+            otp: hashOtp,
+            otpExpires: otpExpiry,
+            termsAndConditions: dto.termsAndConditions,
+            role: 'user',
+            otpAttempts: 0,
+            isGuest: false,
+            guestIp: null,
+            guestDeviceId: null,
+            guestExpiresAt: null,
+          },
+        });
+      } else {
+        newUser = await tx.user.create({
+          data: {
+            email: dto.email,
+            name: dto.name,
+            password: hashPassword,
+            authProvider: 'local',
+            otp: hashOtp,
+            otpExpires: otpExpiry,
+            termsAndConditions: dto.termsAndConditions,
+            role: 'user',
+            otpAttempts: 0,
+          },
+        });
+      }
+
+      // Send verification email inside the transaction — rollback if it fails
+      if (!newUser.isGuest && newUser.email) {
+        try {
+          await this.email.sendEmail({
+            to: newUser.email,
+            subject: `Account verification otp ${process.env.MAIL_FROM_NAME as string}`,
+            html: accountVerificationTemplate({
+              name: newUser.name as string,
+              email: newUser.email,
+              otp: otp,
+            }),
+          });
+        } catch {
+          throw new InternalServerErrorException(
+            'Account created but failed to send verification email. Please try resending OTP.',
+          );
+        }
+      }
+
+      return newUser;
+    });
+
+    // If we reach here, both user creation and email sending succeeded
     return {
-      message: isMailSent
-        ? 'Account created successfully and sent account verification mail.'
-        : `Account created successfully, can't send otp at the moment. Please try again later`,
+      message: user.isGuest
+        ? 'Account created successfully'
+        : 'Account created successfully and sent account verification mail.',
       data: {
         name: user.name,
         email: user.email,
@@ -230,7 +253,7 @@ export class UserService {
     if (!isMatch) {
       await this.prisma.user.update({
         where: { email: dto.email },
-        data: { otpAttempts: { increment: 1 }, otpExpires: null, otp: null },
+        data: { otpAttempts: { increment: 1 } },
       });
       throw new BadRequestException('Invalid otp');
     }
@@ -478,7 +501,7 @@ export class UserService {
     if (!isMatch) {
       await this.prisma.user.update({
         where: { email: dto.email },
-        data: { otpAttempts: { increment: 1 }, otpExpires: null, otp: null },
+        data: { otpAttempts: { increment: 1 } },
       });
       throw new BadRequestException('Invalid otp');
     }

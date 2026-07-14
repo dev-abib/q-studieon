@@ -112,6 +112,14 @@ export class DynamicPageService {
 
   // update dynamic page service
   async updateDynamicPageBySlug(slug: string, dto: UpdateDynamicPageDto) {
+    const existing = await this.prisma.dynamicPage.findUnique({
+      where: { slug: slug },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Page not found');
+    }
+
     const page = await this.prisma.dynamicPage.update({
       where: { slug: slug },
       data: {
@@ -120,10 +128,6 @@ export class DynamicPageService {
         description: dto.description,
       },
     });
-
-    if (!page) {
-      throw new NotFoundException('Page not found');
-    }
 
     return {
       message: `Dynamic page updated successfully`,
@@ -135,13 +139,17 @@ export class DynamicPageService {
 
   // delete dynamic page service
   async deleteDynamicPage(slug: string) {
-    const page = await this.prisma.dynamicPage.delete({
+    const existing = await this.prisma.dynamicPage.findUnique({
       where: { slug: slug },
     });
 
-    if (!page) {
+    if (!existing) {
       throw new NotFoundException('Page not found');
     }
+
+    await this.prisma.dynamicPage.delete({
+      where: { slug: slug },
+    });
 
     return {
       message: `Page deleted successfully`,
