@@ -119,7 +119,7 @@ export class UserController {
   @Post('google-login')
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: 'Login with Google OAuth' })
+  @ApiOperation({ summary: 'Login with Google OAuth (optionally convert guest account)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -130,20 +130,29 @@ export class UserController {
             'Google OAuth access token obtained from the Google OAuth frontend flow',
           example: 'ya29.a0AeO...',
         },
+        guestId: {
+          type: 'string',
+          description:
+            'Guest ID to convert a guest session into a permanent Google account',
+          example: 'guest_abc123',
+        },
       },
       required: ['token'],
     },
   })
-  googleLogin(@Body('token') token: string) {
+  googleLogin(
+    @Body('token') token: string,
+    @Body('guestId') guestId?: string,
+  ) {
     if (!token) throw new BadRequestException('Google token is required');
-    return this.authService.googleLogin(token);
+    return this.authService.googleLogin(token, guestId);
   }
 
   // Apple login controller
   @Post('apple-login')
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: 'Login with Apple OAuth' })
+  @ApiOperation({ summary: 'Login with Apple OAuth (optionally convert guest account)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -154,13 +163,22 @@ export class UserController {
             'Apple identity token obtained from the Apple Sign-In frontend flow',
           example: 'eyJraWQiOi...',
         },
+        guestId: {
+          type: 'string',
+          description:
+            'Guest ID to convert a guest session into a permanent Apple account',
+          example: 'guest_abc123',
+        },
       },
       required: ['token'],
     },
   })
-  appleLogin(@Body('token') token: string) {
+  appleLogin(
+    @Body('token') token: string,
+    @Body('guestId') guestId?: string,
+  ) {
     if (!token) throw new BadRequestException('Apple token is required');
-    return this.authService.appleLogin(token);
+    return this.authService.appleLogin(token, guestId);
   }
 
   // log out controller

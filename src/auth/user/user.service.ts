@@ -709,19 +709,68 @@ export class UserService {
   }
 
   //  google login service
-  async googleLogin(token: string) {
+  async googleLogin(token: string, guestId?: string) {
     const res = await this.verifyGoogleAccessToken(token);
     const { name, email, picture } = res;
 
-    let user = await this.prisma.user.findUnique({
-      where: { email: email },
-    });
+    let user: User;
 
-    if (!user) {
-      user = await this.prisma.user.create({
+    if (guestId) {
+      // Guest conversion path: upgrade the guest record with Google info
+      user = await this.prisma.$transaction(async (tx) => {
+        const guestUser = await tx.user.findUnique({
+          where: { id: guestId },
+        });
+
+        if (!guestUser) {
+          throw new BadRequestException(
+            'Guest session not found or has expired.',
+          );
+        }
+
+        if (!guestUser.isGuest) {
+          throw new BadRequestException('Invalid guest session');
+        }
+
+        // Check if the Google email is already taken by another user
+        const existingEmailUser = await tx.user.findFirst({
+          where: { email, id: { not: guestId } },
+        });
+
+        if (existingEmailUser) {
+          throw new ConflictException(
+            'An account with this email already exists. Please log in instead.',
+          );
+        }
+
+        return tx.user.update({
+          where: { id: guestId },
+          data: {
+            email,
+            name: name ?? guestUser.name,
+            profilePictureURL: picture,
+            profilePicturePublicId: null,
+            authProvider: 'google',
+            isGuest: false,
+            isOtpVerified: true,
+            termsAndConditions: true,
+            guestIp: null,
+            guestDeviceId: null,
+            guestExpiresAt: null,
+            password: crypto.randomBytes(32).toString('hex'),
+          },
+        });
+      });
+    } else {
+      // Normal path: find existing user by email or create new
+      const existing = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      user = existing ?? await this.prisma.user.create({
         data: {
-          email: email,
-          name: name,
+          email,
+          name,
           profilePictureURL: picture,
           profilePicturePublicId: null,
           isOtpVerified: true,
@@ -759,13 +808,16 @@ export class UserService {
       profilePictureURL: user.profilePictureURL,
     };
 
-    await this.email.sendEmail({
-      to: user.email as string,
-      subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
-      html: accountVerificationConfirmationTemplate({
-        name: user.name as string,
-      }),
-    });
+    // Only send welcome email for new registrations, not for existing users logging in
+    if (!guestId) {
+      await this.email.sendEmail({
+        to: user.email as string,
+        subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
+        html: accountVerificationConfirmationTemplate({
+          name: user.name as string,
+        }),
+      });
+    }
 
     return {
       message: 'Google login successful',
@@ -780,18 +832,67 @@ export class UserService {
   }
 
   // apple login service
-  async appleLogin(token: string) {
+  async appleLogin(token: string, guestId?: string) {
     const res = await this.verifyAppleToken(token);
     const { email } = res;
 
-    let user = await this.prisma.user.findUnique({
-      where: { email: email },
-    });
+    let user: User;
 
-    if (!user) {
-      user = await this.prisma.user.create({
+    if (guestId) {
+      // Guest conversion path: upgrade the guest record with Apple info
+      user = await this.prisma.$transaction(async (tx) => {
+        const guestUser = await tx.user.findUnique({
+          where: { id: guestId },
+        });
+
+        if (!guestUser) {
+          throw new BadRequestException(
+            'Guest session not found or has expired.',
+          );
+        }
+
+        if (!guestUser.isGuest) {
+          throw new BadRequestException('Invalid guest session');
+        }
+
+        // Check if the Apple email is already taken by another user
+        const existingEmailUser = await tx.user.findFirst({
+          where: { email, id: { not: guestId } },
+        });
+
+        if (existingEmailUser) {
+          throw new ConflictException(
+            'An account with this email already exists. Please log in instead.',
+          );
+        }
+
+        return tx.user.update({
+          where: { id: guestId },
+          data: {
+            email,
+            name: guestUser.name ?? 'apple user',
+            profilePictureURL: null,
+            profilePicturePublicId: null,
+            authProvider: 'apple',
+            isGuest: false,
+            isOtpVerified: true,
+            termsAndConditions: true,
+            guestIp: null,
+            guestDeviceId: null,
+            guestExpiresAt: null,
+            password: crypto.randomBytes(32).toString('hex'),
+          },
+        });
+      });
+    } else {
+      // Normal path: find existing user by email or create new
+      const existing = await this.prisma.user.findUnique({
+        where: { email },
+      });
+
+      user = existing ?? await this.prisma.user.create({
         data: {
-          email: email,
+          email,
           name: 'apple user',
           profilePictureURL: null,
           profilePicturePublicId: null,
@@ -830,13 +931,16 @@ export class UserService {
       profilePictureURL: user.profilePictureURL,
     };
 
-    await this.email.sendEmail({
-      to: user.email as string,
-      subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
-      html: accountVerificationConfirmationTemplate({
-        name: user.name as string,
-      }),
-    });
+    // Only send welcome email for new registrations, not for existing users logging in
+    if (!guestId) {
+      await this.email.sendEmail({
+        to: user.email as string,
+        subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
+        html: accountVerificationConfirmationTemplate({
+          name: user.name as string,
+        }),
+      });
+    }
 
     return {
       message: 'Apple login successful',
