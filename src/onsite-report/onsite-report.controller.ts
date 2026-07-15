@@ -3,7 +3,9 @@ import {
   Body,
   Post,
   Get,
+  Delete,
   Param,
+  HttpCode,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -97,6 +99,11 @@ export class OnsiteReportController {
   @Post('add-report-to-collection/:collectionId')
   @Auth('user')
   @ApiOperation({ summary: 'Add a report to a collection' })
+  @ApiParam({
+    name: 'collectionId',
+    description: 'Collection ID',
+    example: 'cmqr3abc123',
+  })
   addToCollection(
     @Param('collectionId') collectionId: string,
     @Body() dto: AddReportToCollectionDto,
@@ -105,6 +112,48 @@ export class OnsiteReportController {
     return this.onsiteReportService.addReportToCollection(
       collectionId,
       dto.reportId,
+      user.id,
+    );
+  }
+
+  @Delete('collection/:collectionId')
+  @Auth('user')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete a collection by ID' })
+  @ApiParam({
+    name: 'collectionId',
+    description: 'Collection ID',
+    example: 'cmqr3abc123',
+  })
+  deleteCollection(
+    @Param('collectionId') collectionId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.onsiteReportService.deleteCollection(collectionId, user.id);
+  }
+
+  @Delete('collection/:collectionId/report/:reportId')
+  @Auth('user')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Remove a report from a collection' })
+  @ApiParam({
+    name: 'collectionId',
+    description: 'Collection ID',
+    example: 'cmqr3abc123',
+  })
+  @ApiParam({
+    name: 'reportId',
+    description: 'Report ID to remove from the collection',
+    example: 'cmqr3def456',
+  })
+  removeReportFromCollection(
+    @Param('collectionId') collectionId: string,
+    @Param('reportId') reportId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.onsiteReportService.removeReportFromCollection(
+      collectionId,
+      reportId,
       user.id,
     );
   }

@@ -363,6 +363,60 @@ export class OnsiteReportService {
     };
   }
 
+  async deleteCollection(collectionId: string, userId: string) {
+    const collection = await this.prisma.collection.findFirst({
+      where: { id: collectionId, userId },
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection not found or access denied');
+    }
+
+    await this.prisma.collection.delete({
+      where: { id: collectionId },
+    });
+
+    return {
+      success: true,
+      message: 'Collection deleted successfully',
+    };
+  }
+
+  async removeReportFromCollection(
+    collectionId: string,
+    reportId: string,
+    userId: string,
+  ) {
+    const collection = await this.prisma.collection.findFirst({
+      where: { id: collectionId, userId },
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection not found or access denied');
+    }
+
+    const link = await this.prisma.reportCollection.findUnique({
+      where: {
+        reportId_collectionId: { reportId, collectionId },
+      },
+    });
+
+    if (!link) {
+      throw new NotFoundException('Report is not in this collection');
+    }
+
+    await this.prisma.reportCollection.delete({
+      where: {
+        reportId_collectionId: { reportId, collectionId },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Report removed from collection successfully',
+    };
+  }
+
   async addReportToCollection(
     collectionId: string,
     reportId: string,

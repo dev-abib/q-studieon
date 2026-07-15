@@ -1,5 +1,10 @@
-import { Controller, Body, Post, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Body, Post, Get, Param } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -27,5 +32,20 @@ export class ReportController {
   @ApiOperation({ summary: 'Get all reports for the current user' })
   getMyReports(@CurrentUser() user: JwtPayload) {
     return this.reportService.getMyReports(user.id);
+  }
+
+  @Get(':reportId')
+  @Auth('user')
+  @ApiOperation({ summary: 'Get a single remote property report by ID' })
+  @ApiParam({
+    name: 'reportId',
+    description: 'Remote property report ID',
+    example: 'cmqr3abc123',
+  })
+  getOne(
+    @Param('reportId') reportId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.reportService.getReportById(reportId, user);
   }
 }

@@ -13,7 +13,10 @@ import type {
   AiResponse,
   CreateReportResponse,
 } from './types/report.types';
-import { getAccessLevel, buildReportResponse } from '../auth/helpers/report-response.helper';
+import {
+  getAccessLevel,
+  buildReportResponse,
+} from '../auth/helpers/report-response.helper';
 import type { JwtPayload } from '../auth/types/jwt.types';
 
 @Injectable()
@@ -120,6 +123,34 @@ export class ReportService {
     return {
       message: `Reports extracted successfully`,
       data: reports,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // GET /report/:reportId
+  // ---------------------------------------------------------------------------
+
+  async getReportById(
+    reportId: string,
+    user: JwtPayload,
+  ): Promise<CreateReportResponse> {
+    const data = await this.prisma.report.findFirst({
+      where: { id: reportId, userId: user.id, type: 'property_report' },
+    });
+
+    if (!data) throw new NotFoundException('Report not found.');
+
+    const accessLevel = getAccessLevel(user);
+    const { report: reportData, accessLevel: accessLvl } =
+      buildReportResponse(data, accessLevel);
+
+    return {
+      success: true,
+      message: 'Report retrieved successfully.',
+      data: {
+        report: reportData,
+        accessLevel: accessLvl,
+      },
     };
   }
 }
