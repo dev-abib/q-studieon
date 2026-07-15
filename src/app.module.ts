@@ -20,6 +20,7 @@ import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
 import { ReportModule } from './report/report.module';
 import { OnsiteReportModule } from './onsite-report/onsite-report.module';
 import { QuestionsModule } from './questions/questions.module';
+import { SharedReportModule } from './shared-report/shared-report.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { QuestionsModule } from './questions/questions.module';
     ReportModule,
     OnsiteReportModule,
     QuestionsModule,
+    SharedReportModule,
   ],
   controllers: [AppController, SubscriptionController, DynamicPageController],
   providers: [

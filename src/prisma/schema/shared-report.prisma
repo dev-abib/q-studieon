@@ -1,0 +1,17 @@
+model SharedReport {
+  id         String   @id @default(cuid())
+  reportId   String
+  token      String   @unique @default(uuid())
+  sharedById String
+  address    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  report     Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sharedBy   User     @relation(fields: [sharedById], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([reportId])
+  @@index([sharedById])
+  @@map("shared_reports")
+}
