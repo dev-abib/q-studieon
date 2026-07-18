@@ -28,6 +28,7 @@ import {
   AddReportToCollectionDto,
   CreateCollectionDto,
   UpdateCollectionDto,
+  RenameCollectionDto,
 } from './helpers/dto/collection.dto';
 import type { MulterFile } from '../common/pipes/file-validation.pipe';
 
@@ -131,7 +132,33 @@ export class OnsiteReportController {
     @Body() dto: UpdateCollectionDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.onsiteReportService.updateCollection(collectionId, user.id, dto);
+    return this.onsiteReportService.updateCollection(
+      collectionId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Patch('rename-collection/:collectionId')
+  @Auth('user')
+  @ApiOperation({ summary: 'Rename a collection (change only the name)' })
+  @ApiParam({
+    name: 'collectionId',
+    description: 'Collection ID to rename',
+    example: 'cmqr3abc123',
+  })
+  renameCollection(
+    @Param('collectionId') collectionId: string,
+    @Body() dto: RenameCollectionDto,
+    @CurrentUser() user: JwtPayload,
+  ): unknown {
+    const rename = this.onsiteReportService.renameCollection as (
+      collectionId: string,
+      userId: string,
+      dto: RenameCollectionDto,
+    ) => unknown;
+
+    return rename(collectionId, user.id, dto);
   }
 
   @Delete('collection/:collectionId')
