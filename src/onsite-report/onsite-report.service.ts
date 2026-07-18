@@ -19,7 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
 import { SubmitOnsiteReportDto } from './helpers/dto/submit-report.dto';
-import { CreateCollectionDto } from './helpers/dto/collection.dto';
+import { CreateCollectionDto, UpdateCollectionDto } from './helpers/dto/collection.dto';
 import { CaptureType } from './helpers/dto/add.capture.dto';
 import { CloudinaryService } from '../common/services/cloudinary.service';
 import {
@@ -460,6 +460,52 @@ export class OnsiteReportService {
       success: true,
       message: 'Report added to collection successfully',
       data: link,
+    };
+  }
+
+  async updateCollection(
+    collectionId: string,
+    userId: string,
+    dto: UpdateCollectionDto,
+  ) {
+    const name = dto.name.trim();
+
+    const collection = await this.prisma.collection.findFirst({
+      where: { id: collectionId, userId },
+    });
+
+    if (!collection) {
+      throw new NotFoundException('Collection not found or access denied');
+    }
+
+    // Check if another collection with the new name already exists
+    const existing = await this.prisma.collection.findUnique({
+      where: {
+        userId_name: { userId, name },
+      },
+    });
+
+    if (existing && existing.id !== collectionId) {
+      return {
+        success: false,
+        message: `Collection with name "${name}" already exists`,
+      };
+    }
+
+    const updated = await this.prisma.collection.update({
+      where: { id: collectionId },
+      data: {
+        name,
+        ...(dto.description !== undefined
+          ? { description: dto.description?.trim() ?? null }
+          : {}),
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Collection updated successfully',
+      data: updated,
     };
   }
 

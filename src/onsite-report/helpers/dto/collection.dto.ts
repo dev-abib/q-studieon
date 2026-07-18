@@ -20,6 +20,25 @@ export class CreateCollectionDto {
   description?: string;
 }
 
+export class UpdateCollectionDto {
+  @ApiProperty({
+    description: 'New name for the collection',
+    example: 'My Updated Favorites',
+  })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({
+    description: 'Optional new description for the collection',
+    example: 'An updated collection of my top reports',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
 export class AddReportToCollectionDto {
   @ApiProperty({
     description: 'ID of the report to add to the collection',

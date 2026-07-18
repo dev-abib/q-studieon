@@ -3,6 +3,7 @@ import {
   Body,
   Post,
   Get,
+  Patch,
   Delete,
   Param,
   HttpCode,
@@ -26,6 +27,7 @@ import { SubmitOnsiteReportDto } from './helpers/dto/submit-report.dto';
 import {
   AddReportToCollectionDto,
   CreateCollectionDto,
+  UpdateCollectionDto,
 } from './helpers/dto/collection.dto';
 import type { MulterFile } from '../common/pipes/file-validation.pipe';
 
@@ -114,6 +116,22 @@ export class OnsiteReportController {
       dto.reportId,
       user.id,
     );
+  }
+
+  @Patch('collection/:collectionId')
+  @Auth('user')
+  @ApiOperation({ summary: 'Update a collection name and/or description' })
+  @ApiParam({
+    name: 'collectionId',
+    description: 'Collection ID',
+    example: 'cmqr3abc123',
+  })
+  updateCollection(
+    @Param('collectionId') collectionId: string,
+    @Body() dto: UpdateCollectionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.onsiteReportService.updateCollection(collectionId, user.id, dto);
   }
 
   @Delete('collection/:collectionId')
