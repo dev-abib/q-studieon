@@ -17,6 +17,7 @@ import type {
   GetSharedReportPreviewResponse,
   GetSharedReportFullResponse,
   SharedReportPreview,
+  SharedReportCapture,
 } from './types/shared-report.types';
 
 @Injectable()
@@ -170,12 +171,17 @@ export class SharedReportService {
     const { report: reportData, accessLevel: accessLvl } =
       buildReportResponse(report, accessLevel);
 
+    // Extract onsite capture data with photoUrls if this is an onsite report
+    const isPaid = accessLvl === 'paid_full';
+    const onsiteData = this.extractOnsiteCaptures(report.metadata, isPaid);
+
     return {
       success: true,
       data: {
         report: reportData as Record<string, unknown>,
         accessLevel: accessLvl,
         reportType: report.type,
+        ...onsiteData,
       },
     };
   }
@@ -242,5 +248,48 @@ export class SharedReportService {
       };
     }
     return null;
+  }
+
+  /**
+   * Extract onsite capture data (including photoUrls) from metadata JSON.
+   * Only returns data when isPaid is true (i.e., for paid_full access level).
+   */
+  private extractOnsiteCaptures(
+    metadata: Prisma.JsonValue,
+    isPaid: boolean,
+  ): { totalLevels?: number; totalCaptures?: number; captures?: SharedReportCapture[] } {
+    if (!isPaid || !metadata || typeof metadata !== 'object') {
+      return {};
+    }
+
+    const m = metadata as Record<string, unknown>;
+    if (m.reportMode !== 'onsite') {
+      return {};
+    }
+
+    const totalLevels = typeof m.totalLevels === 'number' ? m.totalLevels : 0;
+    const totalCaptures = typeof m.totalCaptures === 'number' ? m.totalCaptures : 0;
+    const rawCaptures = Array.isArray(m.captures) ? m.captures : [];
+
+    const captures: SharedReportCapture[] = rawCaptures.map((c: unknown) => {
+      const cap = (c ?? {}) as Record<string, unknown>;
+      return {
+        id: (cap.id as string) ?? '',
+        captureType: (cap.captureType as string) ?? '',
+        bearingDegrees: (cap.bearingDegrees as number) ?? 0,
+        cardinal: (cap.cardinal as string) ?? '',
+        isMainEntrance: (cap.isMainEntrance as boolean) ?? false,
+        notes: (cap.notes as string | null | undefined) ?? null,
+        createdAt:
+          typeof cap.createdAt === 'string' || typeof cap.createdAt === 'object'
+            ? new Date(cap.createdAt as string | Date)
+            : new Date(),
+        photoUrls: Array.isArray(cap.photoUrls)
+          ? (cap.photoUrls as string[])
+          : [],
+      };
+    });
+
+    return { totalLevels, totalCaptures, captures };
   }
 }

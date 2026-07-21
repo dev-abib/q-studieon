@@ -288,9 +288,10 @@ describe('OnsiteReportService', () => {
       );
     });
 
-    it('uploads files to Cloudinary when provided', async () => {
+    it('uploads files to Cloudinary when provided with element field naming', async () => {
       const mockFiles = [
         {
+          fieldname: 'element_0',
           originalname: 'photo.jpg',
           mimetype: 'image/jpeg',
           size: 100000,
@@ -301,9 +302,40 @@ describe('OnsiteReportService', () => {
       expect(cloudinary.uploadFile).toHaveBeenCalledTimes(1);
     });
 
+    it('rejects file with invalid fieldname', async () => {
+      const badFile = [
+        {
+          fieldname: 'photos',
+          originalname: 'photo.jpg',
+          mimetype: 'image/jpeg',
+          size: 100000,
+          buffer: Buffer.from(''),
+        },
+      ] as any;
+      await expect(
+        service.submitReport(validDto, mockUser, badFile),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects file with out-of-range element index', async () => {
+      const badFile = [
+        {
+          fieldname: 'element_5',
+          originalname: 'photo.jpg',
+          mimetype: 'image/jpeg',
+          size: 100000,
+          buffer: Buffer.from(''),
+        },
+      ] as any;
+      await expect(
+        service.submitReport(validDto, mockUser, badFile),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('rejects invalid file type', async () => {
       const badFile = [
         {
+          fieldname: 'element_0',
           originalname: 'doc.pdf',
           mimetype: 'application/pdf',
           size: 1000,
@@ -318,6 +350,7 @@ describe('OnsiteReportService', () => {
     it('rejects oversized file', async () => {
       const bigFile = [
         {
+          fieldname: 'element_0',
           originalname: 'big.jpg',
           mimetype: 'image/jpeg',
           size: 11 * 1024 * 1024,
@@ -328,6 +361,76 @@ describe('OnsiteReportService', () => {
         service.submitReport(validDto, mockUser, bigFile),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('maps multiple photos to the correct elements', async () => {
+      // Two elements in the DTO
+      const twoElementDto = {
+        ...validDto,
+        levels: [
+          {
+            levelName: 'Ground Floor',
+            levelNumber: 0,
+            elements: [
+              {
+                categorySlug: 'front_entrance',
+                answers: [{ question: 'Condition?', selectedOption: 'Good' }],
+                bearingDegrees: 180,
+              },
+              {
+                categorySlug: 'kitchen',
+                answers: [{ question: 'Clean?', selectedOption: 'Yes' }],
+                bearingDegrees: 90,
+              },
+            ],
+          },
+        ],
+      } as SubmitOnsiteReportDto;
+
+      const mockFiles = [
+        {
+          fieldname: 'element_0',
+          originalname: 'entrance.jpg',
+          mimetype: 'image/jpeg',
+          size: 100000,
+          buffer: Buffer.from(''),
+        },
+        {
+          fieldname: 'element_0',
+          originalname: 'entrance-closeup.jpg',
+          mimetype: 'image/jpeg',
+          size: 100000,
+          buffer: Buffer.from(''),
+        },
+        {
+          fieldname: 'element_1',
+          originalname: 'kitchen.jpg',
+          mimetype: 'image/jpeg',
+          size: 100000,
+          buffer: Buffer.from(''),
+        },
+      ] as any;
+
+      // Mock cloudinary to return different URLs for each file
+      cloudinary.uploadFile
+        .mockResolvedValueOnce({ url: 'https://img.com/entrance.jpg', publicId: 'entrance' })
+        .mockResolvedValueOnce({ url: 'https://img.com/entrance-closeup.jpg', publicId: 'entrance-closeup' })
+        .mockResolvedValueOnce({ url: 'https://img.com/kitchen.jpg', publicId: 'kitchen' });
+
+      const result = await service.submitReport(twoElementDto, mockPaidUser, mockFiles);
+
+      expect(cloudinary.uploadFile).toHaveBeenCalledTimes(3);
+      // Capture 0 (front_entrance) should have 2 photos
+      expect(result.data.captures[0].photoUrls).toEqual([
+        'https://img.com/entrance.jpg',
+        'https://img.com/entrance-closeup.jpg',
+      ]);
+      // Capture 1 (kitchen) should have 1 photo
+      expect(result.data.captures[1].photoUrls).toEqual([
+        'https://img.com/kitchen.jpg',
+      ]);
+    });
+
+
   });
 
   // -----------------------------------------------------------------------

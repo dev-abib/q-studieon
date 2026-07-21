@@ -11,6 +11,7 @@ export interface OnsiteCaptureData {
   isMainEntrance: boolean;
   notes?: string | null;
   createdAt: Date;
+  photoUrls: string[]; // URLs of photos associated with this capture
 }
 
 // ── Onsite metadata shape stored in Report.metadata ──────────────────────────

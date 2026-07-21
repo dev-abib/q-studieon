@@ -40,10 +40,27 @@ export interface GetSharedReportPreviewResponse {
 
 // ── Full Report (auth required) ─────────────────────────────────────────────
 
+export interface SharedReportCapture {
+  id: string;
+  captureType: string;
+  bearingDegrees: number;
+  cardinal: string;
+  isMainEntrance: boolean;
+  notes?: string | null;
+  createdAt: Date;
+  photoUrls: string[];
+}
+
 export interface SharedReportFullData {
   report: Record<string, unknown>;
   accessLevel: 'paid_full' | 'free_preview' | 'guest_preview';
   reportType: string;
+  /** Onsite-only: total number of levels */
+  totalLevels?: number;
+  /** Onsite-only: total number of captures */
+  totalCaptures?: number;
+  /** Onsite-only: structured captures with photoUrls */
+  captures?: SharedReportCapture[];
 }
 
 export interface GetSharedReportFullResponse {

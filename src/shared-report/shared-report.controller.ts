@@ -51,6 +51,13 @@ export class SharedReportController {
   @ApiOperation({
     summary:
       'Get full shared report (auth required) — returns report based on viewer access level',
+    description:
+      'Returns the full report with access-level filtering.\n\n' +
+      'For **onsite property reports** viewed with `paid_full` access, the response includes:\n' +
+      '- `totalLevels` (number) — total number of levels surveyed\n' +
+      '- `totalCaptures` (number) — total number of captures/elements\n' +
+      '- `captures` (array) — each capture includes `photoUrls` (string[]) mapping the uploaded photos to that specific capture/element\n\n' +
+      'For non-onsite reports or lower access levels, these fields are omitted.',
   })
   @ApiParam({
     name: 'token',

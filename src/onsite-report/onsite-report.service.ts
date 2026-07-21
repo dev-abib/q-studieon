@@ -115,9 +115,68 @@ export class OnsiteReportService {
 
     const mainElement = mainElements[0] ?? allElements[0];
 
-    // ── Build typed captures ─────────────────────────────────────────────────
+    // ── Validate and upload photos to Cloudinary ────────────────────────────
 
-    const typedCaptures: OnsiteCaptureData[] = allElements.map((e) => ({
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const maxSize = 10 * 1024 * 1024; // 10 MB
+
+    let uploadedPhotos: { url: string; publicId: string }[] = [];
+    // Maps flattened element index → uploaded photo URLs
+    const photosByElement = new Map<number, { url: string; publicId: string }[]>();
+
+    if (files && files.length > 0) {
+      // Validate each file and parse fieldnames
+      for (const file of files) {
+        if (!allowedMimes.includes(file.mimetype)) {
+          throw new BadRequestException(
+            `Invalid file type: ${file.mimetype}. Allowed: ${allowedMimes.join(', ')}`,
+          );
+        }
+        if (file.size > maxSize) {
+          throw new BadRequestException(
+            `File ${file.originalname} exceeds 10MB limit`,
+          );
+        }
+
+        // Fieldname must follow the pattern: element_{index}
+        // e.g., element_0, element_1, etc.
+        const match = file.fieldname?.match(/^element_(\d+)$/);
+        if (!match) {
+          throw new BadRequestException(
+            `Invalid photo field name: "${file.fieldname ?? ''}". ` +
+              'Expected format: element_{index} (e.g., element_0, element_1).',
+          );
+        }
+        const elementIndex = parseInt(match[1], 10);
+        if (elementIndex >= allElements.length) {
+          throw new BadRequestException(
+            `Photo field "${file.fieldname}" references element index ${elementIndex}, ` +
+              `but only ${allElements.length} element(s) were provided.`,
+          );
+        }
+      }
+
+      // Upload ALL files to Cloudinary in parallel
+      uploadedPhotos = await Promise.all(
+        files.map((file) => this.cloudinary.uploadFile(file, 'onsite-reports')),
+      );
+
+      // Group uploaded photos by element index based on fieldname
+      for (let i = 0; i < files.length; i++) {
+        const match = files[i].fieldname?.match(/^element_(\d+)$/);
+        if (match) {
+          const elementIndex = parseInt(match[1], 10);
+          if (!photosByElement.has(elementIndex)) {
+            photosByElement.set(elementIndex, []);
+          }
+          photosByElement.get(elementIndex)!.push(uploadedPhotos[i]);
+        }
+      }
+    }
+
+    // ── Build typed captures with photo mapping ─────────────────────────────
+
+    const typedCaptures: OnsiteCaptureData[] = allElements.map((e, index) => ({
       id: crypto.randomUUID(),
       captureType: e.categorySlug as CaptureType,
       bearingDegrees: e.bearingDegrees,
@@ -125,6 +184,7 @@ export class OnsiteReportService {
       isMainEntrance: e.categorySlug === 'front_entrance',
       notes: e.notes ?? null,
       createdAt: new Date(),
+      photoUrls: (photosByElement.get(index) ?? []).map((p) => p.url),
     }));
 
     const mainCardinal = this.onsiteAiHelper.getCardinalFromBearing(
@@ -140,32 +200,6 @@ export class OnsiteReportService {
       entranceDegrees: mainElement.bearingDegrees,
       entranceLabel: mainCardinal,
     });
-
-    // ── Validate and upload photos to Cloudinary ────────────────────────────
-
-    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 10 * 1024 * 1024; // 10 MB
-
-    let uploadedPhotos: { url: string; publicId: string }[] = [];
-    if (files && files.length > 0) {
-      // Validate each file
-      for (const file of files) {
-        if (!allowedMimes.includes(file.mimetype)) {
-          throw new BadRequestException(
-            `Invalid file type: ${file.mimetype}. Allowed: ${allowedMimes.join(', ')}`,
-          );
-        }
-        if (file.size > maxSize) {
-          throw new BadRequestException(
-            `File ${file.originalname} exceeds 10MB limit`,
-          );
-        }
-      }
-
-      uploadedPhotos = await Promise.all(
-        files.map((file) => this.cloudinary.uploadFile(file, 'onsite-reports')),
-      );
-    }
 
     // ── Place photos (Google Maps) ───────────────────────────────────────────
 
