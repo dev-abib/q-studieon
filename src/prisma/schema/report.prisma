@@ -29,6 +29,14 @@ model Report {
   promptTokens            Int?
   totalTokens             Int?
   vastu                   Json?
+
+  // Address fields
+  address                  String?
+  latitude                 Float?
+  longitude                Float?
+  entranceDegrees          Float?
+  entranceLabel            String?
+
   ReportCollection        ReportCollection[]
   user                    User?              @relation(fields: [userId], references: [id])
   sharedReports           SharedReport[]

@@ -36,6 +36,13 @@ export const reportListSelect = {
   overview: true,
   createdAt: true,
   metadata: true,
+  photos: true,
+  placeId: true,
+  address: true,
+  latitude: true,
+  longitude: true,
+  entranceDegrees: true,
+  entranceLabel: true,
 } satisfies Prisma.ReportSelect;
 
 export type ReportListItem = Prisma.ReportGetPayload<{

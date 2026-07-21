@@ -44,9 +44,10 @@ export class OnsiteReportController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description:
-      'Multipart form-data: address, latitude, longitude, levels (JSON string), optional photos',
+      'Multipart form-data: address, latitude, longitude, levels (JSON string), photos (image files)',
     schema: {
       type: 'object',
+      required: ['address', 'latitude', 'longitude', 'levels'],
       properties: {
         address: { type: 'string', example: '123 Main St, New York, NY' },
         latitude: { type: 'number', example: 40.7128 },
@@ -58,10 +59,10 @@ export class OnsiteReportController {
           example:
             '[{"levelName":"Ground Floor","levelNumber":0,"elements":[{"categorySlug":"front_entrance","answers":[{"question":"Condition?","selectedOption":"Good"}],"bearingDegrees":180}]}]',
         },
-        files: {
+        photos: {
           type: 'array',
           items: { type: 'string', format: 'binary' },
-          description: 'Optional photos (JPEG, PNG, WebP)',
+          description: 'Upload photos (JPEG, PNG, WebP - max 10MB each)',
         },
       },
     },
@@ -151,14 +152,12 @@ export class OnsiteReportController {
     @Param('collectionId') collectionId: string,
     @Body() dto: RenameCollectionDto,
     @CurrentUser() user: JwtPayload,
-  ): unknown {
-    const rename = this.onsiteReportService.renameCollection as (
-      collectionId: string,
-      userId: string,
-      dto: RenameCollectionDto,
-    ) => unknown;
-
-    return rename(collectionId, user.id, dto);
+  ) {
+    return this.onsiteReportService.renameCollection(
+      collectionId,
+      user.id,
+      dto,
+    );
   }
 
   @Delete('collection/:collectionId')
@@ -210,6 +209,25 @@ export class OnsiteReportController {
   })
   getCollectionsWithReports(@CurrentUser() user: JwtPayload) {
     return this.onsiteReportService.getCollectionsWithReports(user.id);
+  }
+
+  // -------------------------------------------------------------------------
+  // DELETE /onsite-report/:reportId
+  // -------------------------------------------------------------------------
+  @Delete(':reportId')
+  @Auth('user')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete an on-site report by ID' })
+  @ApiParam({
+    name: 'reportId',
+    description: 'On-site report ID to delete',
+    example: 'cmqr3abc123',
+  })
+  deleteOne(
+    @Param('reportId') reportId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.onsiteReportService.deleteReport(reportId, user);
   }
 
   // ==================== DYNAMIC ROUTE - MUST BE LAST ====================

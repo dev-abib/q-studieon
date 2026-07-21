@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportService } from './report.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -69,7 +70,7 @@ function mockSaved(overrides: Record<string, unknown> = {}) {
 
 describe('ReportService', () => {
   let service: ReportService;
-  let prisma: { report: { create: jest.Mock; findMany: jest.Mock } };
+  let prisma: { report: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock } };
   let generateByAccessLevel: jest.Mock;
 
   const mockUser: JwtPayload = {
@@ -151,6 +152,8 @@ describe('ReportService', () => {
       report: {
         create: jest.fn().mockResolvedValue(mockSaved()),
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(mockSaved()),
+        delete: jest.fn().mockResolvedValue({ id: 'rpt_001' }),
       },
     };
 
@@ -271,6 +274,40 @@ describe('ReportService', () => {
     });
   });
 
+  describe('deleteReport', () => {
+    it('successfully deletes a remote report', async () => {
+      const result = await service.deleteReport('rpt_001', mockUser);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Remote property report deleted successfully.');
+      expect(prisma.report.findFirst).toHaveBeenCalledWith({
+        where: { id: 'rpt_001', userId: mockUser.id, type: 'property_report' },
+      });
+      expect(prisma.report.delete).toHaveBeenCalledWith({
+        where: { id: 'rpt_001' },
+      });
+    });
+
+    it('throws NotFoundException when report does not exist', async () => {
+      prisma.report.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteReport('nonexistent', mockUser),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.report.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when report belongs to another user', async () => {
+      const otherUser = { ...mockUser, id: 'other_user' };
+      prisma.report.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteReport('rpt_001', otherUser),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.report.delete).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getMyReports', () => {
     it('returns a list of reports', async () => {
       const reports = [
@@ -285,12 +322,12 @@ describe('ReportService', () => {
       expect(result.data).toHaveLength(2);
     });
 
-    it('returns an empty array when no reports exist (findMany returns [])', async () => {
+    it('throws NotFoundException when no reports exist', async () => {
       prisma.report.findMany.mockResolvedValue([]);
 
-      const result = await service.getMyReports('user_001');
-      expect(result.data).toEqual([]);
-      expect(result.message).toBe('Reports extracted successfully');
+      await expect(
+        service.getMyReports('user_001'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

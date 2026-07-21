@@ -19,7 +19,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
 import { SubmitOnsiteReportDto } from './helpers/dto/submit-report.dto';
-import { CreateCollectionDto, UpdateCollectionDto, RenameCollectionDto } from './helpers/dto/collection.dto';
+import {
+  CreateCollectionDto,
+  UpdateCollectionDto,
+  RenameCollectionDto,
+} from './helpers/dto/collection.dto';
 import { CaptureType } from './helpers/dto/add.capture.dto';
 import { CloudinaryService } from '../common/services/cloudinary.service';
 import {
@@ -208,6 +212,8 @@ export class OnsiteReportService {
 
     // ── Persist ───────────────────────────────────────────────────────────────
 
+    const allPhotos = [...googlePhotos, ...uploadedPhotos];
+
     const saved = await this.prisma.report.create({
       data: {
         userId: user.id,
@@ -215,7 +221,14 @@ export class OnsiteReportService {
         status: 'completed',
 
         placeId,
-        photos: toJson([...googlePhotos, ...uploadedPhotos]),
+        photos: toJson(allPhotos),
+
+        // Store address data
+        address: dto.address,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        entranceDegrees: mainElement.bearingDegrees,
+        entranceLabel: mainCardinal,
 
         overallAlignmentSummary: report.overall_alignment_summary,
         overview: report.overview,
@@ -312,6 +325,50 @@ export class OnsiteReportService {
         totalCaptures: isPaid ? meta.totalCaptures : 0,
         captures: isPaid ? meta.captures : [],
       },
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // DELETE /onsite-report/:reportId
+  // ---------------------------------------------------------------------------
+
+  async deleteReport(
+    reportId: string,
+    user: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
+    const report = await this.prisma.report.findFirst({
+      where: { id: reportId, userId: user.id, type: 'onsite_property_report' },
+    });
+
+    if (!report) throw new NotFoundException('Report not found.');
+
+    // Delete associated photos from Cloudinary if they exist
+    const rawPhotos: unknown = report.photos;
+    if (Array.isArray(rawPhotos)) {
+      for (const item of rawPhotos) {
+        if (
+          item &&
+          typeof item === 'object' &&
+          'publicId' in item &&
+          typeof (item as Record<string, unknown>).publicId === 'string'
+        ) {
+          const publicId = (item as Record<string, unknown>).publicId as string;
+          try {
+            await this.cloudinary.deleteFile(publicId);
+          } catch {
+            // Silently continue if a photo fails to delete
+          }
+        }
+      }
+    }
+
+    await this.prisma.report.delete({
+      where: { id: reportId },
+    });
+
+    return {
+      success: true,
+      message: 'On-site report deleted successfully.',
     };
   }
 

@@ -26,6 +26,12 @@ describe('ReportController', () => {
       getMyReports: jest
         .fn()
         .mockResolvedValue({ message: 'Reports', data: [] }),
+      deleteReport: jest
+        .fn()
+        .mockResolvedValue({
+          success: true,
+          message: 'Remote property report deleted successfully.',
+        }),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -55,5 +61,10 @@ describe('ReportController', () => {
   it('getMyReports calls service.getMyReports with user id', async () => {
     await controller.getMyReports(mockUser);
     expect(service.getMyReports).toHaveBeenCalledWith(mockUser.id);
+  });
+
+  it('deleteOne calls service.deleteReport with report id and user', async () => {
+    await controller.deleteOne('rpt_001', mockUser);
+    expect(service.deleteReport).toHaveBeenCalledWith('rpt_001', mockUser);
   });
 });

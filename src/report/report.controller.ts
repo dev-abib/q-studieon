@@ -1,4 +1,12 @@
-import { Controller, Body, Post, Get, Param } from '@nestjs/common';
+import {
+  Controller,
+  Body,
+  Post,
+  Get,
+  Delete,
+  Param,
+  HttpCode,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -34,6 +42,22 @@ export class ReportController {
     return this.reportService.getMyReports(user.id);
   }
 
+  @Delete(':reportId')
+  @Auth('user')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete a remote property report by ID' })
+  @ApiParam({
+    name: 'reportId',
+    description: 'Remote property report ID to delete',
+    example: 'cmqr3abc123',
+  })
+  deleteOne(
+    @Param('reportId') reportId: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.reportService.deleteReport(reportId, user);
+  }
+
   @Get(':reportId')
   @Auth('user')
   @ApiOperation({ summary: 'Get a single remote property report by ID' })
@@ -42,10 +66,7 @@ export class ReportController {
     description: 'Remote property report ID',
     example: 'cmqr3abc123',
   })
-  getOne(
-    @Param('reportId') reportId: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  getOne(@Param('reportId') reportId: string, @CurrentUser() user: JwtPayload) {
     return this.reportService.getReportById(reportId, user);
   }
 }

@@ -53,6 +53,12 @@ describe('OnsiteReportController', () => {
           success: true,
           data: { collections: [], recentStandaloneReports: [] },
         }),
+      deleteReport: jest
+        .fn()
+        .mockResolvedValue({
+          success: true,
+          message: 'On-site report deleted successfully.',
+        }),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -87,5 +93,10 @@ describe('OnsiteReportController', () => {
   it('getOne calls service.getReportById with report id and user', async () => {
     await controller.getOne('rpt_001', mockUser);
     expect(service.getReportById).toHaveBeenCalledWith('rpt_001', mockUser);
+  });
+
+  it('deleteOne calls service.deleteReport with report id and user', async () => {
+    await controller.deleteOne('rpt_001', mockUser);
+    expect(service.deleteReport).toHaveBeenCalledWith('rpt_001', mockUser);
   });
 });

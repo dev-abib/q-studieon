@@ -11,8 +11,8 @@ import type { JwtPayload } from '../auth/types/jwt.types';
 
 describe('OnsiteReportService', () => {
   let service: OnsiteReportService;
-  let prisma: Partial<Record<keyof PrismaService, jest.Mock>>;
-  let cloudinary: Partial<Record<keyof CloudinaryService, jest.Mock>>;
+  let prisma: Record<string, any>;
+  let cloudinary: Record<string, any>;
 
   const mockUser: JwtPayload = {
     id: 'user_001',
@@ -70,6 +70,7 @@ describe('OnsiteReportService', () => {
             ],
           },
         }),
+        delete: jest.fn().mockResolvedValue({ id: 'rpt_001' }),
       },
       collection: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -97,6 +98,7 @@ describe('OnsiteReportService', () => {
           url: 'https://img.com/photo.jpg',
           publicId: 'p_001',
         }),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -349,6 +351,99 @@ describe('OnsiteReportService', () => {
       await expect(
         service.getReportById('nonexistent', mockUser),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // deleteReport
+  // -----------------------------------------------------------------------
+  describe('deleteReport', () => {
+    const mockReportWithPhotos = {
+      id: 'rpt_001',
+      userId: 'user_001',
+      type: 'onsite_property_report',
+      status: 'completed',
+      photos: [
+        { url: 'https://img.com/photo1.jpg', publicId: 'p_001' },
+        { url: 'https://img.com/photo2.jpg', publicId: 'p_002' },
+        { url: 'https://img.com/gphoto.jpg' }, // Google photo without publicId
+      ],
+      placeId: 'place_001',
+      address: '123 Test St',
+      latitude: 40.71,
+      longitude: -74.0,
+      entranceDegrees: 180,
+      entranceLabel: 'S',
+    };
+
+    it('successfully deletes a report and its cloudinary photos', async () => {
+      prisma.report.findFirst.mockResolvedValue(mockReportWithPhotos);
+
+      const result = await service.deleteReport('rpt_001', mockUser);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('On-site report deleted successfully.');
+      // Should delete cloudinary photos that have publicId
+      expect(cloudinary.deleteFile).toHaveBeenCalledTimes(2);
+      expect(cloudinary.deleteFile).toHaveBeenCalledWith('p_001');
+      expect(cloudinary.deleteFile).toHaveBeenCalledWith('p_002');
+      // Should not try to delete Google photos (no publicId)
+      expect(cloudinary.deleteFile).not.toHaveBeenCalledWith(undefined);
+      // Should delete the report from DB
+      expect(prisma.report.delete).toHaveBeenCalledWith({
+        where: { id: 'rpt_001' },
+      });
+    });
+
+    it('successfully deletes a report with no photos', async () => {
+      prisma.report.findFirst.mockResolvedValue({
+        ...mockReportWithPhotos,
+        photos: null,
+      });
+
+      const result = await service.deleteReport('rpt_002', mockUser);
+
+      expect(result.success).toBe(true);
+      expect(cloudinary.deleteFile).not.toHaveBeenCalled();
+      expect(prisma.report.delete).toHaveBeenCalledWith({
+        where: { id: 'rpt_002' },
+      });
+    });
+
+    it('throws NotFoundException when report does not exist', async () => {
+      prisma.report.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteReport('nonexistent', mockUser),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.report.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when report belongs to another user', async () => {
+      // findFirst returns null because the query filters by userId
+      prisma.report.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteReport('rpt_001', {
+          ...mockUser,
+          id: 'other_user',
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.report.delete).not.toHaveBeenCalled();
+    });
+
+    it('handles cloudinary deletion errors gracefully', async () => {
+      prisma.report.findFirst.mockResolvedValue(mockReportWithPhotos);
+      // One photo fails to delete
+      cloudinary.deleteFile
+        .mockRejectedValueOnce(new Error('Cloudinary error'))
+        .mockResolvedValueOnce(undefined);
+
+      const result = await service.deleteReport('rpt_001', mockUser);
+
+      // Should still succeed and delete the report
+      expect(result.success).toBe(true);
+      expect(prisma.report.delete).toHaveBeenCalled();
     });
   });
 

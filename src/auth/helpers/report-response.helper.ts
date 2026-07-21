@@ -2,6 +2,24 @@ import { Report } from '@prisma/client';
 import { ReportAccessLevel } from './ai-helper';
 import type { JwtPayload } from '../types/jwt.types';
 
+export interface AddressData {
+  address: string | null;
+  entranceDegrees: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  entranceLabel: string | null;
+}
+
+export function extractAddressData(saved: Report): AddressData {
+  return {
+    address: saved.address ?? null,
+    entranceDegrees: saved.entranceDegrees ?? null,
+    latitude: saved.latitude ?? null,
+    longitude: saved.longitude ?? null,
+    entranceLabel: saved.entranceLabel ?? null,
+  };
+}
+
 export function getAccessLevel(user: JwtPayload): ReportAccessLevel {
   if (user.isPaid) return ReportAccessLevel.PAID_FULL;
   if (user.isGuest) return ReportAccessLevel.GUEST_PREVIEW;
@@ -28,6 +46,8 @@ export function buildReportResponse(
   saved: Report,
   accessLevel: ReportAccessLevel,
 ): ReportData {
+  const addressData = extractAddressData(saved);
+
   const base = {
     id: saved.id,
     createdAt: saved.createdAt,
@@ -37,6 +57,9 @@ export function buildReportResponse(
     overallScore: saved.overallScore,
     auspiciousnessLevel: saved.auspiciousnessLevel,
     overview: saved.overview,
+    photos: saved.photos,
+    placeId: saved.placeId,
+    address: addressData,
   };
 
   if (accessLevel === ReportAccessLevel.PAID_FULL) {

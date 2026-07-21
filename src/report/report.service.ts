@@ -68,7 +68,14 @@ export class ReportService {
         status: 'completed',
 
         placeId: photosDetails.placeId,
-        photos: photosDetails.photos as unknown as Prisma.JsonArray,
+        photos: photosDetails.photos as unknown as Prisma.InputJsonValue[],
+
+        // Store address data
+        address: dto.address,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        entranceDegrees: dto.entranceDegrees,
+        entranceLabel: dto.entranceLabel,
 
         overallAlignmentSummary: report.overall_alignment_summary,
         overview: report.overview,
@@ -79,19 +86,17 @@ export class ReportService {
         familyFlowSummary: report.family_flow.summary,
         familyFlowNarrative: report.family_flow.narrative,
 
-        entranceDirection:
-          report.entrance_direction as unknown as Prisma.JsonObject,
+        entranceDirection: report.entrance_direction,
 
-        entranceEnergy: report.entrance_energy as unknown as Prisma.JsonObject,
-        numerology: report.numerology as unknown as Prisma.JsonObject,
-        fengShui: report.feng_shui as unknown as Prisma.JsonObject,
-        vastu: report.vastu as unknown as Prisma.JsonObject,
+        entranceEnergy: report.entrance_energy,
+        numerology: report.numerology,
+        fengShui: report.feng_shui,
+        vastu: report.vastu,
 
-        indicators: report.indicators as unknown as Prisma.JsonObject,
-        practicalRemedies:
-          report.practical_remedies as unknown as Prisma.JsonArray,
-        helpfulTips: report.helpful_tips as unknown as Prisma.JsonArray,
-        lifeAspects: report.life_aspects as unknown as Prisma.JsonObject,
+        indicators: report.indicators,
+        practicalRemedies: report.practical_remedies,
+        helpfulTips: report.helpful_tips,
+        lifeAspects: report.life_aspects,
 
         aiModel: metadata.model,
         promptTokens: metadata.usage?.prompt_tokens ?? 0,
@@ -116,13 +121,37 @@ export class ReportService {
       where: { userId: id },
     });
 
-    if (!reports) {
+    if (!reports || reports.length === 0) {
       throw new NotFoundException('no reports found');
     }
 
     return {
       message: `Reports extracted successfully`,
       data: reports,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // DELETE /report/:reportId
+  // ---------------------------------------------------------------------------
+
+  async deleteReport(
+    reportId: string,
+    user: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
+    const report = await this.prisma.report.findFirst({
+      where: { id: reportId, userId: user.id, type: 'property_report' },
+    });
+
+    if (!report) throw new NotFoundException('Report not found.');
+
+    await this.prisma.report.delete({
+      where: { id: reportId },
+    });
+
+    return {
+      success: true,
+      message: 'Remote property report deleted successfully.',
     };
   }
 
@@ -141,8 +170,10 @@ export class ReportService {
     if (!data) throw new NotFoundException('Report not found.');
 
     const accessLevel = getAccessLevel(user);
-    const { report: reportData, accessLevel: accessLvl } =
-      buildReportResponse(data, accessLevel);
+    const { report: reportData, accessLevel: accessLvl } = buildReportResponse(
+      data,
+      accessLevel,
+    );
 
     return {
       success: true,
