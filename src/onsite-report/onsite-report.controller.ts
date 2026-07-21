@@ -59,13 +59,12 @@ export class OnsiteReportController {
           example:
             '[{"levelName":"Ground Floor","levelNumber":0,"elements":[{"categorySlug":"front_entrance","answers":[{"question":"Condition?","selectedOption":"Good"}],"bearingDegrees":180}]}]',
         },
-        'element_{index}': {
+        element_0: {
           type: 'string',
           format: 'binary',
           description:
             'Upload photos using field names like element_0, element_1, etc. The number is the flattened element index (0-based). ' +
             'Send multiple files with the same field name for multiple photos of the same element. ' +
-            'Example: element_0 (front entrance photo), element_1 (kitchen photo). ' +
             'Accepted formats: JPEG, PNG, WebP. Max 10MB each.',
         },
       },

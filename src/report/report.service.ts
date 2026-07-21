@@ -1,5 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Report } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PlaceDetailsHelper } from '../auth/helpers/place-details.helper';
 import { NumerologyHelpers } from '../auth/helpers/numerology-helpers';
@@ -19,6 +23,10 @@ import {
 } from '../auth/helpers/report-response.helper';
 import type { JwtPayload } from '../auth/types/jwt.types';
 
+function toJson(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
 @Injectable()
 export class ReportService {
   constructor(
@@ -32,88 +40,95 @@ export class ReportService {
     dto: CreateReportDto,
     user: JwtPayload,
   ): Promise<CreateReportResponse> {
-    const placeDetails = await this.placeDetailsHelper.getPlacePhotos({
-      lat: dto.latitude,
-      lng: dto.longitude,
-    });
+    try {
+      const placeDetails = await this.placeDetailsHelper.getPlacePhotos({
+        lat: dto.latitude,
+        lng: dto.longitude,
+      });
 
-    const photosDetails = {
-      placeId: placeDetails?.[0]?.place_id ?? null,
-      photos: [
-        placeDetails?.[0]?.photos?.[0],
-        placeDetails?.[0]?.photos?.[1],
-      ].filter(Boolean),
-    };
+      const photosDetails = {
+        placeId: placeDetails?.[0]?.place_id ?? null,
+        photos: [
+          placeDetails?.[0]?.photos?.[0],
+          placeDetails?.[0]?.photos?.[1],
+        ].filter(Boolean),
+      };
 
-    const numerologyDetails = this.numerologyHelpers.createReport(dto);
+      const numerologyDetails = this.numerologyHelpers.createReport(dto);
 
-    // Always generate full report for DB storage
-    const aiResponse = (await this.aiHelper.generateByAccessLevel(
-      ReportAccessLevel.PAID_FULL,
-      {
-        address: dto.address,
-        numerologyDetails,
-        entranceBearing: dto.entranceDegrees,
-        userConfirmedDirection: true,
-      },
-    )) as AiResponse;
+      // Always generate full report for DB storage
+      const aiResponse = (await this.aiHelper.generateByAccessLevel(
+        ReportAccessLevel.PAID_FULL,
+        {
+          address: dto.address,
+          numerologyDetails,
+          entranceBearing: dto.entranceDegrees,
+          userConfirmedDirection: true,
+        },
+      )) as AiResponse;
 
-    const report: AiReport = aiResponse.data;
-    const metadata: AiMetadata = aiResponse.metadata;
+      const report: AiReport = aiResponse.data;
+      const metadata: AiMetadata = aiResponse.metadata;
 
-    const saved = await this.prisma.report.create({
-      data: {
-        userId: user.id,
-        type: 'property_report',
-        status: 'completed',
+      const saved = await this.prisma.report.create({
+        data: {
+          userId: user.id,
+          type: 'property_report',
+          status: 'completed',
 
-        placeId: photosDetails.placeId,
-        photos: photosDetails.photos as unknown as Prisma.InputJsonValue[],
+          placeId: photosDetails.placeId,
+          photos: toJson(photosDetails.photos),
 
-        // Store address data
-        address: dto.address,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        entranceDegrees: dto.entranceDegrees,
-        entranceLabel: dto.entranceLabel,
+          // Store address data
+          address: dto.address,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          entranceDegrees: dto.entranceDegrees,
+          entranceLabel: dto.entranceLabel,
 
-        overallAlignmentSummary: report.overall_alignment_summary,
-        overview: report.overview,
-        overallScore: report.overall_score,
-        auspiciousnessLevel: report.auspiciousness.level,
-        auspiciousnessSummary: report.auspiciousness.summary,
+          overallAlignmentSummary: report.overall_alignment_summary,
+          overview: report.overview,
+          overallScore: report.overall_score,
+          auspiciousnessLevel: report.auspiciousness.level,
+          auspiciousnessSummary: report.auspiciousness.summary,
 
-        familyFlowSummary: report.family_flow.summary,
-        familyFlowNarrative: report.family_flow.narrative,
+          familyFlowSummary: report.family_flow.summary,
+          familyFlowNarrative: report.family_flow.narrative,
 
-        entranceDirection: report.entrance_direction,
+          entranceDirection: toJson(report.entrance_direction),
+          entranceEnergy: toJson(report.entrance_energy),
+          numerology: toJson(report.numerology),
+          fengShui: toJson(report.feng_shui),
+          vastu: toJson(report.vastu),
 
-        entranceEnergy: report.entrance_energy,
-        numerology: report.numerology,
-        fengShui: report.feng_shui,
-        vastu: report.vastu,
+          indicators: toJson(report.indicators),
+          practicalRemedies: toJson(report.practical_remedies),
+          helpfulTips: toJson(report.helpful_tips),
+          lifeAspects: toJson(report.life_aspects),
 
-        indicators: report.indicators,
-        practicalRemedies: report.practical_remedies,
-        helpfulTips: report.helpful_tips,
-        lifeAspects: report.life_aspects,
+          aiModel: metadata.model,
+          promptTokens: metadata.usage?.prompt_tokens ?? 0,
+          completionTokens: metadata.usage?.completion_tokens ?? 0,
+          totalTokens: metadata.usage?.total_tokens ?? 0,
+          finishReason: metadata.finishReason,
+        },
+      });
 
-        aiModel: metadata.model,
-        promptTokens: metadata.usage?.prompt_tokens ?? 0,
-        completionTokens: metadata.usage?.completion_tokens ?? 0,
-        totalTokens: metadata.usage?.total_tokens ?? 0,
-        finishReason: metadata.finishReason,
-      },
-    });
+      // Build response based on user's access level
+      const accessLevel = getAccessLevel(user);
 
-    // Build response based on user's access level
-    const accessLevel = getAccessLevel(user);
-
-    return {
-      success: true,
-      message: 'Home alignment report generated successfully',
-      data: buildReportResponse(saved, accessLevel),
-    };
+      return {
+        success: true,
+        message: 'Home alignment report generated successfully',
+        data: buildReportResponse(saved, accessLevel),
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[ReportService] createReport failed:', message);
+      throw new InternalServerErrorException(
+        `Failed to create report: ${message}`,
+      );
+    }
   }
 
   async getMyReports(id: string) {
