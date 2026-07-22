@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../common/services/cloudinary.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -34,7 +38,9 @@ export class CategoryService {
     });
 
     if (existing) {
-      throw new ConflictException(`Category with name "${dto.name}" already exists`);
+      throw new ConflictException(
+        `Category with name "${dto.name}" already exists`,
+      );
     }
 
     let iconUrl: string | null = dto.icon ?? null;
@@ -130,7 +136,11 @@ export class CategoryService {
   }
 
   // update category by ID service
-  async updateCategoryById(id: string, dto: UpdateCategoryDto, file?: MulterFile) {
+  async updateCategoryById(
+    id: string,
+    dto: UpdateCategoryDto,
+    file?: MulterFile,
+  ) {
     const existing = await this.prisma.category.findUnique({
       where: { id },
     });
@@ -151,7 +161,9 @@ export class CategoryService {
       });
 
       if (duplicate) {
-        throw new ConflictException(`Category with name "${dto.name}" already exists`);
+        throw new ConflictException(
+          `Category with name "${dto.name}" already exists`,
+        );
       }
 
       updateData.name = dto.name;
@@ -219,6 +231,4 @@ export class CategoryService {
       message: 'Category deleted successfully',
     };
   }
-
-
 }

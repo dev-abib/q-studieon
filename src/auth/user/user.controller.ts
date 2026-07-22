@@ -119,7 +119,9 @@ export class UserController {
   @Post('google-login')
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: 'Login with Google OAuth (optionally convert guest account)' })
+  @ApiOperation({
+    summary: 'Login with Google OAuth (optionally convert guest account)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -140,10 +142,7 @@ export class UserController {
       required: ['token'],
     },
   })
-  googleLogin(
-    @Body('token') token: string,
-    @Body('guestId') guestId?: string,
-  ) {
+  googleLogin(@Body('token') token: string, @Body('guestId') guestId?: string) {
     if (!token) throw new BadRequestException('Google token is required');
     return this.authService.googleLogin(token, guestId);
   }
@@ -152,7 +151,9 @@ export class UserController {
   @Post('apple-login')
   @HttpCode(200)
   @Public()
-  @ApiOperation({ summary: 'Login with Apple OAuth (optionally convert guest account)' })
+  @ApiOperation({
+    summary: 'Login with Apple OAuth (optionally convert guest account)',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -173,10 +174,7 @@ export class UserController {
       required: ['token'],
     },
   })
-  appleLogin(
-    @Body('token') token: string,
-    @Body('guestId') guestId?: string,
-  ) {
+  appleLogin(@Body('token') token: string, @Body('guestId') guestId?: string) {
     if (!token) throw new BadRequestException('Apple token is required');
     return this.authService.appleLogin(token, guestId);
   }

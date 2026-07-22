@@ -7,7 +7,10 @@ export class CreateDynamicPageDto {
   @IsNotEmpty({ message: 'Title is required' })
   title: string;
 
-  @ApiProperty({ example: 'This is the about us page content...', description: 'Page description/content' })
+  @ApiProperty({
+    example: 'This is the about us page content...',
+    description: 'Page description/content',
+  })
   @IsString()
   @IsNotEmpty({ message: 'Description is required' })
   @MinLength(1)

@@ -18,7 +18,10 @@ export class ResetPasswordDto {
   })
   password: string;
 
-  @ApiProperty({ example: 'NewStrongP@ss1', description: 'Must match the new password' })
+  @ApiProperty({
+    example: 'NewStrongP@ss1',
+    description: 'Must match the new password',
+  })
   @IsString()
   @Match('password', { message: 'Passwords do not match' })
   confirmPassword: string;

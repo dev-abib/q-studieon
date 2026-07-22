@@ -10,7 +10,18 @@ describe('AdminController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminController],
       providers: [
-        { provide: AdminService, useValue: { getMeAdmin: jest.fn(), getAllAdminsUsers: jest.fn(), createAdmin: jest.fn(), updateAdmin: jest.fn(), deleteAdminOrUser: jest.fn(), getDashboardAnalytics: jest.fn(), sendAdminMail: jest.fn() } },
+        {
+          provide: AdminService,
+          useValue: {
+            getMeAdmin: jest.fn(),
+            getAllAdminsUsers: jest.fn(),
+            createAdmin: jest.fn(),
+            updateAdmin: jest.fn(),
+            deleteAdminOrUser: jest.fn(),
+            getDashboardAnalytics: jest.fn(),
+            sendAdminMail: jest.fn(),
+          },
+        },
         { provide: UserService, useValue: { getMe: jest.fn() } },
       ],
     }).compile();

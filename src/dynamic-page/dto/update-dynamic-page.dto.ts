@@ -9,7 +9,10 @@ export class UpdateDynamicPageDto {
   @IsOptional()
   title?: string;
 
-  @ApiPropertyOptional({ example: 'Updated description...', description: 'Page description/content' })
+  @ApiPropertyOptional({
+    example: 'Updated description...',
+    description: 'Page description/content',
+  })
   @IsString()
   @IsOptional()
   description?: string;

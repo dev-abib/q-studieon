@@ -8,7 +8,10 @@ export class CreateCategoryDto {
   @MinLength(1)
   name: string;
 
-  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/...', description: 'Cloudinary icon URL for the category' })
+  @ApiPropertyOptional({
+    example: 'https://res.cloudinary.com/...',
+    description: 'Cloudinary icon URL for the category',
+  })
   @IsString()
   @IsOptional()
   icon?: string;

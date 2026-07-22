@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -75,9 +79,7 @@ export class QuestionsService {
     const where: any = {};
 
     if (search) {
-      where.OR = [
-        { text: { contains: search, mode: 'insensitive' as const } },
-      ];
+      where.OR = [{ text: { contains: search, mode: 'insensitive' as const } }];
     }
 
     if (categoryId) {

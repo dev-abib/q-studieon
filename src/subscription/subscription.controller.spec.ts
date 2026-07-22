@@ -9,7 +9,15 @@ describe('SubscriptionController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SubscriptionController],
       providers: [
-        { provide: SubscriptionService, useValue: { crateCheckoutSession: jest.fn(), cancelSubscription: jest.fn(), reactivateSubscription: jest.fn(), handleWebHook: jest.fn() } },
+        {
+          provide: SubscriptionService,
+          useValue: {
+            crateCheckoutSession: jest.fn(),
+            cancelSubscription: jest.fn(),
+            reactivateSubscription: jest.fn(),
+            handleWebHook: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

@@ -20,7 +20,10 @@ export class GetAllCategoriesDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ example: 'createdAt', description: 'Field to sort by' })
+  @ApiPropertyOptional({
+    example: 'createdAt',
+    description: 'Field to sort by',
+  })
   @IsOptional()
   @IsString()
   sortBy?: 'name' | 'slug' | 'createdAt';

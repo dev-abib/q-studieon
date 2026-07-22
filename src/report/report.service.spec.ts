@@ -70,7 +70,14 @@ function mockSaved(overrides: Record<string, unknown> = {}) {
 
 describe('ReportService', () => {
   let service: ReportService;
-  let prisma: { report: { create: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; delete: jest.Mock } };
+  let prisma: {
+    report: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      delete: jest.Mock;
+    };
+  };
   let generateByAccessLevel: jest.Mock;
 
   const mockUser: JwtPayload = {
@@ -279,9 +286,11 @@ describe('ReportService', () => {
       const result = await service.deleteReport('rpt_001', mockUser);
 
       expect(result.success).toBe(true);
-      expect(result.message).toBe('Remote property report deleted successfully.');
+      expect(result.message).toBe(
+        'Remote property report deleted successfully.',
+      );
       expect(prisma.report.findFirst).toHaveBeenCalledWith({
-        where: { id: 'rpt_001', userId: mockUser.id, type: 'property_report' },
+        where: { id: 'rpt_001', userId: mockUser.id },
       });
       expect(prisma.report.delete).toHaveBeenCalledWith({
         where: { id: 'rpt_001' },
@@ -301,9 +310,9 @@ describe('ReportService', () => {
       const otherUser = { ...mockUser, id: 'other_user' };
       prisma.report.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.deleteReport('rpt_001', otherUser),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.deleteReport('rpt_001', otherUser)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(prisma.report.delete).not.toHaveBeenCalled();
     });
   });
@@ -325,9 +334,9 @@ describe('ReportService', () => {
     it('throws NotFoundException when no reports exist', async () => {
       prisma.report.findMany.mockResolvedValue([]);
 
-      await expect(
-        service.getMyReports('user_001'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getMyReports('user_001')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

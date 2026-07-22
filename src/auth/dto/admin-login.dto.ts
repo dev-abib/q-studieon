@@ -8,13 +8,17 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AdminLoginDto {
-  @ApiProperty({ example: 'admin@example.com', description: 'Admin email address' })
+  @ApiProperty({
+    example: 'admin@example.com',
+    description: 'Admin email address',
+  })
   @IsEmail()
   email: string;
 
   @ApiProperty({
     example: 'StrongP@ss1',
-    description: 'Password must be at least 8 chars, include uppercase, lowercase, number and special character',
+    description:
+      'Password must be at least 8 chars, include uppercase, lowercase, number and special character',
     minLength: 8,
     maxLength: 32,
   })

@@ -20,7 +20,10 @@ export class GetAllQuestionsDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ example: 'createdAt', description: 'Field to sort by' })
+  @ApiPropertyOptional({
+    example: 'createdAt',
+    description: 'Field to sort by',
+  })
   @IsOptional()
   @IsString()
   sortBy?: 'text' | 'createdAt';
@@ -30,7 +33,10 @@ export class GetAllQuestionsDto {
   @IsString()
   sortOrder?: 'asc' | 'desc';
 
-  @ApiPropertyOptional({ example: 'category-id-here', description: 'Filter questions by category ID' })
+  @ApiPropertyOptional({
+    example: 'category-id-here',
+    description: 'Filter questions by category ID',
+  })
   @IsOptional()
   @IsString()
   categoryId?: string;

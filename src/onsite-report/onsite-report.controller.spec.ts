@@ -47,18 +47,14 @@ describe('OnsiteReportController', () => {
       addReportToCollection: jest
         .fn()
         .mockResolvedValue({ success: true, data: {} }),
-      getCollectionsWithReports: jest
-        .fn()
-        .mockResolvedValue({
-          success: true,
-          data: { collections: [], recentStandaloneReports: [] },
-        }),
-      deleteReport: jest
-        .fn()
-        .mockResolvedValue({
-          success: true,
-          message: 'On-site report deleted successfully.',
-        }),
+      getCollectionsWithReports: jest.fn().mockResolvedValue({
+        success: true,
+        data: { collections: [], recentStandaloneReports: [] },
+      }),
+      deleteReport: jest.fn().mockResolvedValue({
+        success: true,
+        message: 'On-site report deleted successfully.',
+      }),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({

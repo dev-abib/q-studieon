@@ -38,7 +38,9 @@ export class QuestionsController {
   // get all questions controller (literal path before :id)
   @Get('get-all-questions')
   @Public()
-  @ApiOperation({ summary: 'Get all questions with pagination & optional categoryId filter' })
+  @ApiOperation({
+    summary: 'Get all questions with pagination & optional categoryId filter',
+  })
   getAllQuestions(@Query() dto: GetAllQuestionsDto) {
     return this.questionsService.getAllQuestions(dto);
   }

@@ -9,7 +9,16 @@ describe('DynamicPageController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DynamicPageController],
       providers: [
-        { provide: DynamicPageService, useValue: { createDynamicPage: jest.fn(), getDynamicPageBySlug: jest.fn(), getAllDynamicPage: jest.fn(), updateDynamicPageBySlug: jest.fn(), deleteDynamicPage: jest.fn() } },
+        {
+          provide: DynamicPageService,
+          useValue: {
+            createDynamicPage: jest.fn(),
+            getDynamicPageBySlug: jest.fn(),
+            getAllDynamicPage: jest.fn(),
+            updateDynamicPageBySlug: jest.fn(),
+            deleteDynamicPage: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

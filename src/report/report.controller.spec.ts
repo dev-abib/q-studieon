@@ -26,12 +26,10 @@ describe('ReportController', () => {
       getMyReports: jest
         .fn()
         .mockResolvedValue({ message: 'Reports', data: [] }),
-      deleteReport: jest
-        .fn()
-        .mockResolvedValue({
-          success: true,
-          message: 'Remote property report deleted successfully.',
-        }),
+      deleteReport: jest.fn().mockResolvedValue({
+        success: true,
+        message: 'Remote property report deleted successfully.',
+      }),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({

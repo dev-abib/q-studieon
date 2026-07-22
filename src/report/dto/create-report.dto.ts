@@ -3,7 +3,10 @@ import { IsNumber, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateReportDto {
-  @ApiProperty({ example: '123 Main St, City, Country', description: 'Property address' })
+  @ApiProperty({
+    example: '123 Main St, City, Country',
+    description: 'Property address',
+  })
   @IsString()
   address!: string;
 
@@ -22,7 +25,10 @@ export class CreateReportDto {
   @Type(() => Number)
   longitude!: number;
 
-  @ApiProperty({ example: 'Main Entrance', description: 'Label for the entrance' })
+  @ApiProperty({
+    example: 'Main Entrance',
+    description: 'Label for the entrance',
+  })
   @IsString()
   entranceLabel!: string;
 }

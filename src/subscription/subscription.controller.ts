@@ -7,11 +7,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service';
 import type { JwtPayload } from '../auth/types/jwt.types';
 import { SubscriptionDto } from './dto/subscreption.dto';

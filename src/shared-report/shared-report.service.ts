@@ -43,9 +43,7 @@ export class SharedReportService {
     }
 
     if (report.userId !== user.id) {
-      throw new ForbiddenException(
-        'You can only share your own reports.',
-      );
+      throw new ForbiddenException('You can only share your own reports.');
     }
 
     // Check if this report was already shared by this user — return existing link
@@ -104,7 +102,9 @@ export class SharedReportService {
     });
 
     if (!shared) {
-      throw new NotFoundException('Shared report not found or link is invalid.');
+      throw new NotFoundException(
+        'Shared report not found or link is invalid.',
+      );
     }
 
     const report = shared.report;
@@ -119,9 +119,7 @@ export class SharedReportService {
     const photos = this.extractPhotos(report.photos);
 
     // Extract entrance direction
-    const entrance = this.extractEntranceDirection(
-      report.entranceDirection,
-    );
+    const entrance = this.extractEntranceDirection(report.entranceDirection);
 
     const preview: SharedReportPreview = {
       token: shared.token,
@@ -161,15 +159,19 @@ export class SharedReportService {
     });
 
     if (!shared) {
-      throw new NotFoundException('Shared report not found or link is invalid.');
+      throw new NotFoundException(
+        'Shared report not found or link is invalid.',
+      );
     }
 
     const report = shared.report;
 
     // Determine access level for the viewing user
     const accessLevel = getAccessLevel(user);
-    const { report: reportData, accessLevel: accessLvl } =
-      buildReportResponse(report, accessLevel);
+    const { report: reportData, accessLevel: accessLvl } = buildReportResponse(
+      report,
+      accessLevel,
+    );
 
     // Extract onsite capture data with photoUrls if this is an onsite report
     const isPaid = accessLvl === 'paid_full';
@@ -178,7 +180,7 @@ export class SharedReportService {
     return {
       success: true,
       data: {
-        report: reportData as Record<string, unknown>,
+        report: reportData,
         accessLevel: accessLvl,
         reportType: report.type,
         ...onsiteData,
@@ -190,7 +192,9 @@ export class SharedReportService {
   // GET /shared-report/:token/check  (check if a token is valid)
   // ───────────────────────────────────────────────────────────────────────────
 
-  async checkSharedReport(token: string): Promise<{ success: boolean; isValid: boolean }> {
+  async checkSharedReport(
+    token: string,
+  ): Promise<{ success: boolean; isValid: boolean }> {
     const shared = await this.prisma.sharedReport.findUnique({
       where: { token },
     });
@@ -237,10 +241,7 @@ export class SharedReportService {
     if (!entranceDirection || typeof entranceDirection !== 'object')
       return null;
     const e = entranceDirection as Record<string, unknown>;
-    if (
-      typeof e.degrees === 'number' &&
-      typeof e.cardinal === 'string'
-    ) {
+    if (typeof e.degrees === 'number' && typeof e.cardinal === 'string') {
       return {
         degrees: e.degrees,
         cardinal: e.cardinal,
@@ -257,7 +258,11 @@ export class SharedReportService {
   private extractOnsiteCaptures(
     metadata: Prisma.JsonValue,
     isPaid: boolean,
-  ): { totalLevels?: number; totalCaptures?: number; captures?: SharedReportCapture[] } {
+  ): {
+    totalLevels?: number;
+    totalCaptures?: number;
+    captures?: SharedReportCapture[];
+  } {
     if (!isPaid || !metadata || typeof metadata !== 'object') {
       return {};
     }
@@ -268,7 +273,8 @@ export class SharedReportService {
     }
 
     const totalLevels = typeof m.totalLevels === 'number' ? m.totalLevels : 0;
-    const totalCaptures = typeof m.totalCaptures === 'number' ? m.totalCaptures : 0;
+    const totalCaptures =
+      typeof m.totalCaptures === 'number' ? m.totalCaptures : 0;
     const rawCaptures = Array.isArray(m.captures) ? m.captures : [];
 
     const captures: SharedReportCapture[] = rawCaptures.map((c: unknown) => {

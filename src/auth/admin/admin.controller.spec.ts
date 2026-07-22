@@ -9,7 +9,15 @@ describe('AdminController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminController],
       providers: [
-        { provide: AdminService, useValue: { loginAdmin: jest.fn(), refreshToken: jest.fn(), logOut: jest.fn(), changePassword: jest.fn() } },
+        {
+          provide: AdminService,
+          useValue: {
+            loginAdmin: jest.fn(),
+            refreshToken: jest.fn(),
+            logOut: jest.fn(),
+            changePassword: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

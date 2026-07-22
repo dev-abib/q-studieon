@@ -77,7 +77,9 @@ export class AdminController {
   @Put('update-admin')
   @Auth('admin')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Update admin profile with optional profile picture' })
+  @ApiOperation({
+    summary: 'Update admin profile with optional profile picture',
+  })
   @UseInterceptors(createFileUploadInterceptor({ fieldName: 'profilePicture' }))
   updateAdmin(
     @Body() dto: UpdateAdminDto,

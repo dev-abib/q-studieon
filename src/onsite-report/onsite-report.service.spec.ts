@@ -75,13 +75,11 @@ describe('OnsiteReportService', () => {
       collection: {
         findUnique: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
-        create: jest
-          .fn()
-          .mockResolvedValue({
-            id: 'col_001',
-            name: 'Test',
-            userId: 'user_001',
-          }),
+        create: jest.fn().mockResolvedValue({
+          id: 'col_001',
+          name: 'Test',
+          userId: 'user_001',
+        }),
       },
       reportCollection: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -92,12 +90,10 @@ describe('OnsiteReportService', () => {
     } as any;
 
     cloudinary = {
-      uploadFile: jest
-        .fn()
-        .mockResolvedValue({
-          url: 'https://img.com/photo.jpg',
-          publicId: 'p_001',
-        }),
+      uploadFile: jest.fn().mockResolvedValue({
+        url: 'https://img.com/photo.jpg',
+        publicId: 'p_001',
+      }),
       deleteFile: jest.fn().mockResolvedValue(undefined),
     } as any;
 
@@ -198,14 +194,12 @@ describe('OnsiteReportService', () => {
         {
           provide: PlaceDetailsHelper,
           useValue: {
-            getPlacePhotos: jest
-              .fn()
-              .mockResolvedValue([
-                {
-                  place_id: 'place_001',
-                  photos: [{ photo_reference: 'photo1' }],
-                },
-              ]),
+            getPlacePhotos: jest.fn().mockResolvedValue([
+              {
+                place_id: 'place_001',
+                photos: [{ photo_reference: 'photo1' }],
+              },
+            ]),
           },
         },
       ],
@@ -412,11 +406,24 @@ describe('OnsiteReportService', () => {
 
       // Mock cloudinary to return different URLs for each file
       cloudinary.uploadFile
-        .mockResolvedValueOnce({ url: 'https://img.com/entrance.jpg', publicId: 'entrance' })
-        .mockResolvedValueOnce({ url: 'https://img.com/entrance-closeup.jpg', publicId: 'entrance-closeup' })
-        .mockResolvedValueOnce({ url: 'https://img.com/kitchen.jpg', publicId: 'kitchen' });
+        .mockResolvedValueOnce({
+          url: 'https://img.com/entrance.jpg',
+          publicId: 'entrance',
+        })
+        .mockResolvedValueOnce({
+          url: 'https://img.com/entrance-closeup.jpg',
+          publicId: 'entrance-closeup',
+        })
+        .mockResolvedValueOnce({
+          url: 'https://img.com/kitchen.jpg',
+          publicId: 'kitchen',
+        });
 
-      const result = await service.submitReport(twoElementDto, mockPaidUser, mockFiles);
+      const result = await service.submitReport(
+        twoElementDto,
+        mockPaidUser,
+        mockFiles,
+      );
 
       expect(cloudinary.uploadFile).toHaveBeenCalledTimes(3);
       // Capture 0 (front_entrance) should have 2 photos
@@ -429,8 +436,6 @@ describe('OnsiteReportService', () => {
         'https://img.com/kitchen.jpg',
       ]);
     });
-
-
   });
 
   // -----------------------------------------------------------------------

@@ -767,20 +767,22 @@ export class UserService {
         where: { email },
       });
 
-      user = existing ?? await this.prisma.user.create({
-        data: {
-          email,
-          name,
-          profilePictureURL: picture,
-          profilePicturePublicId: null,
-          isOtpVerified: true,
-          authProvider: 'google',
-          termsAndConditions: true,
-          role: 'user',
-          otpAttempts: 0,
-          password: crypto.randomBytes(32).toString('hex'),
-        },
-      });
+      user =
+        existing ??
+        (await this.prisma.user.create({
+          data: {
+            email,
+            name,
+            profilePictureURL: picture,
+            profilePicturePublicId: null,
+            isOtpVerified: true,
+            authProvider: 'google',
+            termsAndConditions: true,
+            role: 'user',
+            otpAttempts: 0,
+            password: crypto.randomBytes(32).toString('hex'),
+          },
+        }));
     }
 
     const payload = {
@@ -890,20 +892,22 @@ export class UserService {
         where: { email },
       });
 
-      user = existing ?? await this.prisma.user.create({
-        data: {
-          email,
-          name: 'apple user',
-          profilePictureURL: null,
-          profilePicturePublicId: null,
-          isOtpVerified: true,
-          authProvider: 'apple',
-          termsAndConditions: true,
-          role: 'user',
-          otpAttempts: 0,
-          password: crypto.randomBytes(32).toString('hex'),
-        },
-      });
+      user =
+        existing ??
+        (await this.prisma.user.create({
+          data: {
+            email,
+            name: 'apple user',
+            profilePictureURL: null,
+            profilePicturePublicId: null,
+            isOtpVerified: true,
+            authProvider: 'apple',
+            termsAndConditions: true,
+            role: 'user',
+            otpAttempts: 0,
+            password: crypto.randomBytes(32).toString('hex'),
+          },
+        }));
     }
 
     const payload = {

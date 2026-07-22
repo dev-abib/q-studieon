@@ -1,9 +1,13 @@
 model Insight {
-  id            String @id @default(cuid())
-  iconPublicId  String
-  iconPublicUrl String
-  title         String
-  subTitle      String
-  description   String
-  redirectLink  String
+  id           String   @id @default(cuid())
+  icon         String?
+  iconPublicId String?
+  title        String
+  subTitle     String
+  description  String
+  redirectLink String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("insights")
 }

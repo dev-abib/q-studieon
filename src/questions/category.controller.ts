@@ -38,7 +38,9 @@ export class CategoryController {
   @Auth('admin')
   @ApiBearerAuth()
   @UseInterceptors(createFileUploadInterceptor({ fieldName: 'icon' }))
-  @ApiOperation({ summary: 'Create a new category (multipart: name + optional icon file)' })
+  @ApiOperation({
+    summary: 'Create a new category (multipart: name + optional icon file)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Category creation payload',
@@ -47,12 +49,17 @@ export class CategoryController {
       type: 'object',
       properties: {
         name: { type: 'string', example: 'Favorite Color' },
-        icon: { type: 'string', format: 'binary', description: 'Category icon image' },
+        icon: {
+          type: 'string',
+          format: 'binary',
+          description: 'Category icon image',
+        },
       },
     },
   })
   createCategory(
-    @UploadedFile(new FileValidationPipe({ required: false })) file: MulterFile | undefined,
+    @UploadedFile(new FileValidationPipe({ required: false }))
+    file: MulterFile | undefined,
     @Body() dto: CreateCategoryDto,
   ) {
     return this.categoryService.createCategory(dto, file);
@@ -81,7 +88,10 @@ export class CategoryController {
   @Auth('admin')
   @ApiBearerAuth()
   @UseInterceptors(createFileUploadInterceptor({ fieldName: 'icon' }))
-  @ApiOperation({ summary: 'Update a category (multipart: optional name + optional icon file)' })
+  @ApiOperation({
+    summary:
+      'Update a category (multipart: optional name + optional icon file)',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Category update payload',
@@ -90,13 +100,18 @@ export class CategoryController {
       type: 'object',
       properties: {
         name: { type: 'string', example: 'Favorite Color' },
-        icon: { type: 'string', format: 'binary', description: 'Category icon image' },
+        icon: {
+          type: 'string',
+          format: 'binary',
+          description: 'Category icon image',
+        },
       },
     },
   })
   updateCategoryById(
     @Param('id') id: string,
-    @UploadedFile(new FileValidationPipe({ required: false })) file: MulterFile | undefined,
+    @UploadedFile(new FileValidationPipe({ required: false }))
+    file: MulterFile | undefined,
     @Body() dto: UpdateCategoryDto,
   ) {
     return this.categoryService.updateCategoryById(id, dto, file);

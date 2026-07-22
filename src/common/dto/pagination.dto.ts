@@ -22,17 +22,27 @@ export class PaginationDto {
   @Min(1)
   limit: number = 10;
 
-  @ApiPropertyOptional({ example: 'createdAt', description: 'Field to sort by' })
+  @ApiPropertyOptional({
+    example: 'createdAt',
+    description: 'Field to sort by',
+  })
   @IsOptional()
   @IsString()
   sortBy: string = 'createdAt';
 
-  @ApiPropertyOptional({ example: 'desc', description: 'Sort order (asc or desc)', enum: SortOrder })
+  @ApiPropertyOptional({
+    example: 'desc',
+    description: 'Sort order (asc or desc)',
+    enum: SortOrder,
+  })
   @IsOptional()
   @IsEnum(SortOrder)
   sortOrder: SortOrder = SortOrder.DESC;
 
-  @ApiPropertyOptional({ example: 'search term', description: 'Search keyword' })
+  @ApiPropertyOptional({
+    example: 'search term',
+    description: 'Search keyword',
+  })
   @IsOptional()
   @IsString()
   search?: string;

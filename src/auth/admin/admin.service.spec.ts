@@ -12,10 +12,40 @@ describe('AdminService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
-        { provide: PrismaService, useValue: { user: { update: jest.fn(), updateMany: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn() } } },
-        { provide: AuthHelper, useValue: { comparePassword: jest.fn(), hashPassword: jest.fn(), generateToken: jest.fn(), verifyToken: jest.fn(), hashToken: jest.fn(), getJwtConfig: jest.fn() } },
-        { provide: UserRepository, useValue: { findUser: jest.fn(), comparePassword: jest.fn(), logOut: jest.fn() } },
-        { provide: JwtService, useValue: { sign: jest.fn(), verify: jest.fn() } },
+        {
+          provide: PrismaService,
+          useValue: {
+            user: {
+              update: jest.fn(),
+              updateMany: jest.fn(),
+              findFirst: jest.fn(),
+              findUnique: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: AuthHelper,
+          useValue: {
+            comparePassword: jest.fn(),
+            hashPassword: jest.fn(),
+            generateToken: jest.fn(),
+            verifyToken: jest.fn(),
+            hashToken: jest.fn(),
+            getJwtConfig: jest.fn(),
+          },
+        },
+        {
+          provide: UserRepository,
+          useValue: {
+            findUser: jest.fn(),
+            comparePassword: jest.fn(),
+            logOut: jest.fn(),
+          },
+        },
+        {
+          provide: JwtService,
+          useValue: { sign: jest.fn(), verify: jest.fn() },
+        },
       ],
     }).compile();
 

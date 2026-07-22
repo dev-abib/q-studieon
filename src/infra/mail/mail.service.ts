@@ -23,7 +23,7 @@ export class EmailService implements OnModuleInit {
       }
     });
 
-    this.resend = new Resend(process.env.RESEND_API_KEY!);
+    this.resend = new Resend(process.env.RESEND_API_KEY);
   }
 
   async sendEmail(options: SendMailOptions): Promise<boolean> {

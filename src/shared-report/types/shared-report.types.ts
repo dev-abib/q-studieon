@@ -67,4 +67,3 @@ export interface GetSharedReportFullResponse {
   success: boolean;
   data: SharedReportFullData;
 }
-

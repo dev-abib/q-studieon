@@ -7,7 +7,11 @@ export enum PlanType {
 }
 
 export class SubscriptionDto {
-  @ApiProperty({ example: 'monthly', description: 'Subscription plan type', enum: PlanType })
+  @ApiProperty({
+    example: 'monthly',
+    description: 'Subscription plan type',
+    enum: PlanType,
+  })
   @IsEnum(PlanType)
   plan!: PlanType;
 }
