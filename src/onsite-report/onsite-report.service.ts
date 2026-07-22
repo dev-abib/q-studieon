@@ -122,7 +122,10 @@ export class OnsiteReportService {
 
     let uploadedPhotos: { url: string; publicId: string }[] = [];
     // Maps flattened element index → uploaded photo URLs
-    const photosByElement = new Map<number, { url: string; publicId: string }[]>();
+    const photosByElement = new Map<
+      number,
+      { url: string; publicId: string }[]
+    >();
 
     if (files && files.length > 0) {
       // Validate each file and parse fieldnames
@@ -444,6 +447,15 @@ export class OnsiteReportService {
       include: {
         _count: {
           select: { reports: true },
+        },
+        reports: {
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            photos: true,
+            createdAt: true,
+          },
         },
       },
     });
