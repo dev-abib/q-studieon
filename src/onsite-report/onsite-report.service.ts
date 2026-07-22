@@ -444,17 +444,28 @@ export class OnsiteReportService {
     const collections = await this.prisma.collection.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        createdAt: true,
         _count: {
-          select: { reports: true },
+          select: {
+            reports: true,
+          },
         },
         reports: {
           select: {
-            id: true,
-            type: true,
-            status: true,
-            photos: true,
-            createdAt: true,
+            addedAt: true,
+            report: {
+              select: {
+                id: true,
+                type: true,
+                status: true,
+                photos: true,
+                createdAt: true,
+              },
+            },
           },
         },
       },
