@@ -339,8 +339,9 @@ export class OnsiteReportService {
     reportId: string,
     user: JwtPayload,
   ): Promise<GetReportResponse> {
+    console.log(reportId);
     const data = await this.prisma.report.findFirst({
-      where: { id: reportId, userId: user.id, type: 'onsite_property_report' },
+      where: { id: reportId, userId: user.id },
     });
 
     if (!data) throw new NotFoundException('Report not found.');
@@ -374,7 +375,7 @@ export class OnsiteReportService {
     user: JwtPayload,
   ): Promise<{ success: boolean; message: string }> {
     const report = await this.prisma.report.findFirst({
-      where: { id: reportId, userId: user.id, type: 'onsite_property_report' },
+      where: { id: reportId, userId: user.id },
     });
 
     if (!report) throw new NotFoundException('Report not found.');

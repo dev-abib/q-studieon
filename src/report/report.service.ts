@@ -155,7 +155,7 @@ export class ReportService {
     user: JwtPayload,
   ): Promise<{ success: boolean; message: string }> {
     const report = await this.prisma.report.findFirst({
-      where: { id: reportId, userId: user.id, type: 'property_report' },
+      where: { id: reportId, userId: user.id },
     });
 
     if (!report) throw new NotFoundException('Report not found.');
@@ -179,7 +179,7 @@ export class ReportService {
     user: JwtPayload,
   ): Promise<CreateReportResponse> {
     const data = await this.prisma.report.findFirst({
-      where: { id: reportId, userId: user.id, type: 'property_report' },
+      where: { id: reportId, userId: user.id },
     });
 
     if (!data) throw new NotFoundException('Report not found.');

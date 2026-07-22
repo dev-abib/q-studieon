@@ -31,8 +31,8 @@ model User {
   collections            Collection[]
   payments               Payment[]
   reports                Report[]
-  subscriptionEvents     SubscriptionEvent[]
   sharedReports          SharedReport[]
+  subscriptionEvents     SubscriptionEvent[]
 
   @@index([createdAt])
   @@index([isGuest])

@@ -1,0 +1,9 @@
+model Insight {
+  id            String @id @default(cuid())
+  iconPublicId  String
+  iconPublicUrl String
+  title         String
+  subTitle      String
+  description   String
+  redirectLink  String
+}
