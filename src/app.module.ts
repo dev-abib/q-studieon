@@ -19,6 +19,7 @@ import { DynamicPageService } from './dynamic-page/dynamic-page.service';
 import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
 import { ReportModule } from './report/report.module';
 import { OnsiteReportModule } from './onsite-report/onsite-report.module';
+import { CollectionModule } from './collection/collection.module';
 import { QuestionsModule } from './questions/questions.module';
 import { InsightModule } from './insight/insight.module';
 import { SharedReportModule } from './shared-report/shared-report.module';
@@ -37,6 +38,7 @@ import { SharedReportModule } from './shared-report/shared-report.module';
     DynamicPageModule,
     ReportModule,
     OnsiteReportModule,
+    CollectionModule,
     QuestionsModule,
     SharedReportModule,
     InsightModule,

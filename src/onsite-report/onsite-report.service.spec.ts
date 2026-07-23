@@ -73,6 +73,7 @@ describe('OnsiteReportService', () => {
         delete: jest.fn().mockResolvedValue({ id: 'rpt_001' }),
       },
       collection: {
+        findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockResolvedValue({
