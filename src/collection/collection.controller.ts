@@ -8,7 +8,6 @@ import {
   Param,
   HttpCode,
   Query,
-  ParseEnumPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -33,7 +32,7 @@ import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { RenameCollectionDto } from './dto/rename-collection.dto';
 import { AddReportToCollectionDto } from './dto/add-report-to-collection.dto';
 import { CompareReportsDto } from './dto/compare-reports.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { GetAllCollectionsDto } from './dto/get-all-collections.dto';
 
 @ApiTags('Collection')
 @ApiBearerAuth()
@@ -72,13 +71,8 @@ export class CollectionController {
       'Filter by collection type (remote or onsite). When set, both ' +
       'collections and recentReports are filtered to match the type.',
   })
-  findAll(
-    @Query('type', new ParseEnumPipe(CollectionTypeEnum, { optional: true }))
-    type: CollectionTypeEnum | undefined,
-    @Query() pagination: PaginationDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.collectionService.findAll(user.id, pagination, type);
+  findAll(@Query() dto: GetAllCollectionsDto, @CurrentUser() user: JwtPayload) {
+    return this.collectionService.findAll(user.id, dto, dto.type);
   }
 
   @Post('reports/compare')
@@ -135,12 +129,10 @@ export class CollectionController {
     description: 'Filter by report type (remote or onsite)',
   })
   getRecentReports(
-    @Query('type', new ParseEnumPipe(CollectionTypeEnum, { optional: true }))
-    type: CollectionTypeEnum | undefined,
-    @Query() pagination: PaginationDto,
+    @Query() dto: GetAllCollectionsDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.collectionService.findRecentReports(user.id, pagination, type);
+    return this.collectionService.findRecentReports(user.id, dto, dto.type);
   }
 
   @Get(':collectionId/reports')
