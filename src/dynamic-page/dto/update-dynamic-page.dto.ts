@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AtLeastOneField } from '../../auth/decorators/at-least-one-filed.dto';
 
@@ -21,4 +21,12 @@ export class UpdateDynamicPageDto {
   @IsString()
   @IsOptional()
   slug?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the page is publicly visible',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
 }

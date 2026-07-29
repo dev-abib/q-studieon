@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDynamicPageDto {
   @ApiProperty({ example: 'About Us', description: 'Page title' })
@@ -20,4 +20,12 @@ export class CreateDynamicPageDto {
   @IsString()
   @IsNotEmpty({ message: 'Slug is required' })
   slug: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether the page is publicly visible',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
 }

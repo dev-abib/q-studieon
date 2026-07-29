@@ -14,8 +14,6 @@ import { SubscriptionController } from './subscription/subscription.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TasksService } from './tasks/tasks.service';
 import { TasksModule } from './tasks/tasks.module';
-import { DynamicPageController } from './dynamic-page/dynamic-page.controller';
-import { DynamicPageService } from './dynamic-page/dynamic-page.service';
 import { DynamicPageModule } from './dynamic-page/dynamic-page.module';
 import { ReportModule } from './report/report.module';
 import { OnsiteReportModule } from './onsite-report/onsite-report.module';
@@ -43,12 +41,11 @@ import { SharedReportModule } from './shared-report/shared-report.module';
     SharedReportModule,
     InsightModule,
   ],
-  controllers: [AppController, SubscriptionController, DynamicPageController],
+  controllers: [AppController, SubscriptionController],
   providers: [
     AppService,
     SubscriptionService,
     TasksService,
-    DynamicPageService,
   ],
 })
 export class AppModule {}

@@ -27,6 +27,7 @@ export class DynamicPageService {
         title: dto.title,
         slug: dto.slug,
         description: dto.description,
+        isPublished: dto.isPublished ?? false,
       },
     });
 
@@ -38,13 +39,18 @@ export class DynamicPageService {
     };
   }
 
-  // get dynamic page by slug service
+  // get dynamic page by slug service (public — only returns published pages)
   async getDynamicPageBySlug(slug: string) {
     const page = await this.prisma.dynamicPage.findUnique({
       where: { slug: slug },
     });
 
     if (!page) {
+      throw new NotFoundException('Page not found');
+    }
+
+    // Only return published pages to the public; drafts return 404
+    if (!page.isPublished) {
       throw new NotFoundException('Page not found');
     }
 
@@ -76,6 +82,11 @@ export class DynamicPageService {
           ],
         }
       : {};
+
+    // Optionally filter by published status
+    if (dto.published !== undefined) {
+      (where as any).isPublished = dto.published;
+    }
 
     // Run count + paginated fetch in parallel
     const [total, pages] = await Promise.all([
@@ -126,6 +137,7 @@ export class DynamicPageService {
         title: dto.title,
         slug: dto.slug,
         description: dto.description,
+        isPublished: dto.isPublished,
       },
     });
 

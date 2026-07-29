@@ -29,7 +29,11 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://q-studieon-dashboard-next.vercel.app',
+      'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:4000',
+      'http://localhost:4923',
+      'http://localhost:5555',
       'https://admin.dwellr.tech',
     ],
     credentials: true,
