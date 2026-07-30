@@ -1,16 +1,27 @@
+enum ShareType {
+  report
+  collection
+  comparison
+}
+
 model SharedReport {
-  id         String   @id @default(cuid())
-  reportId   String
-  token      String   @unique @default(uuid())
-  sharedById String
-  address    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  report     Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  sharedBy   User     @relation(fields: [sharedById], references: [id], onDelete: Cascade)
+  id                  String      @id @default(cuid())
+  shareType           ShareType   @default(report)
+  reportId            String?
+  collectionId        String?
+  comparisonReportId1 String?
+  comparisonReportId2 String?
+  token               String      @unique @default(uuid())
+  sharedById          String
+  address             String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  report              Report?     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sharedBy            User        @relation(fields: [sharedById], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([reportId])
+  @@index([collectionId])
   @@index([sharedById])
   @@map("shared_reports")
 }

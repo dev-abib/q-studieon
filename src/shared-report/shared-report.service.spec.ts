@@ -231,12 +231,13 @@ describe('SharedReportService', () => {
       );
 
       const result = await service.getSharedReportPreview('token-abc-123');
+      const data = result.data as any;
       expect(result.success).toBe(true);
-      expect(result.data.property.photos).toHaveLength(2);
-      expect(result.data.property.address).toBe('123 Test St');
-      expect(result.data.overallScore).toBe(72);
+      expect(data.property.photos).toHaveLength(2);
+      expect(data.property.address).toBe('123 Test St');
+      expect(data.overallScore).toBe(72);
       // Preview should NOT include captures
-      expect((result.data as any).captures).toBeUndefined();
+      expect(data.captures).toBeUndefined();
     });
 
     it('returns stored address from shared record when available', async () => {
@@ -245,7 +246,7 @@ describe('SharedReportService', () => {
       );
 
       const result = await service.getSharedReportPreview('token-abc-123');
-      expect(result.data.property.address).toBe('456 Oak Ave');
+      expect((result.data as any).property.address).toBe('456 Oak Ave');
     });
 
     it('throws NotFoundException for invalid token', async () => {
@@ -271,32 +272,33 @@ describe('SharedReportService', () => {
         'token-abc-123',
         mockPaidUser,
       );
+      const data = result.data as any;
 
       expect(result.success).toBe(true);
-      expect(result.data.accessLevel).toBe('paid_full');
-      expect(result.data.totalLevels).toBe(2);
-      expect(result.data.totalCaptures).toBe(3);
-      expect(result.data.captures).toBeDefined();
-      expect(result.data.captures).toHaveLength(3);
+      expect(data.accessLevel).toBe('paid_full');
+      expect(data.totalLevels).toBe(2);
+      expect(data.totalCaptures).toBe(3);
+      expect(data.captures).toBeDefined();
+      expect(data.captures).toHaveLength(3);
 
       // Capture 0 — front entrance with 1 photo
-      expect(result.data.captures![0].id).toBe('cap_001');
-      expect(result.data.captures![0].captureType).toBe('front_entrance');
-      expect(result.data.captures![0].isMainEntrance).toBe(true);
-      expect(result.data.captures![0].photoUrls).toEqual([
+      expect(data.captures[0].id).toBe('cap_001');
+      expect(data.captures[0].captureType).toBe('front_entrance');
+      expect(data.captures[0].isMainEntrance).toBe(true);
+      expect(data.captures[0].photoUrls).toEqual([
         'https://img.com/entrance.jpg',
       ]);
 
       // Capture 1 — kitchen with 2 photos
-      expect(result.data.captures![1].id).toBe('cap_002');
-      expect(result.data.captures![1].photoUrls).toEqual([
+      expect(data.captures[1].id).toBe('cap_002');
+      expect(data.captures[1].photoUrls).toEqual([
         'https://img.com/kitchen.jpg',
         'https://img.com/kitchen2.jpg',
       ]);
 
       // Capture 2 — garden with 0 photos
-      expect(result.data.captures![2].id).toBe('cap_003');
-      expect(result.data.captures![2].photoUrls).toEqual([]);
+      expect(data.captures[2].id).toBe('cap_003');
+      expect(data.captures[2].photoUrls).toEqual([]);
     });
 
     // ── Onsite report + free user → should NOT include captures ───────────
@@ -309,11 +311,12 @@ describe('SharedReportService', () => {
         'token-abc-123',
         mockUser,
       );
+      const data = result.data as any;
 
-      expect(result.data.accessLevel).toBe('free_preview');
-      expect(result.data.totalLevels).toBeUndefined();
-      expect(result.data.totalCaptures).toBeUndefined();
-      expect(result.data.captures).toBeUndefined();
+      expect(data.accessLevel).toBe('free_preview');
+      expect(data.totalLevels).toBeUndefined();
+      expect(data.totalCaptures).toBeUndefined();
+      expect(data.captures).toBeUndefined();
     });
 
     // ── Onsite report + guest user → should NOT include captures ─────────
@@ -327,8 +330,8 @@ describe('SharedReportService', () => {
         mockGuestUser,
       );
 
-      expect(result.data.accessLevel).toBe('guest_preview');
-      expect(result.data.captures).toBeUndefined();
+      expect((result.data as any).accessLevel).toBe('guest_preview');
+      expect((result.data as any).captures).toBeUndefined();
     });
 
     // ── Non-onsite report + paid user → should NOT include captures ───────
@@ -341,11 +344,12 @@ describe('SharedReportService', () => {
         'token-abc-123',
         mockPaidUser,
       );
+      const data = result.data as any;
 
-      expect(result.data.accessLevel).toBe('paid_full');
-      expect(result.data.totalLevels).toBeUndefined();
-      expect(result.data.totalCaptures).toBeUndefined();
-      expect(result.data.captures).toBeUndefined();
+      expect(data.accessLevel).toBe('paid_full');
+      expect(data.totalLevels).toBeUndefined();
+      expect(data.totalCaptures).toBeUndefined();
+      expect(data.captures).toBeUndefined();
     });
 
     // ── Invalid token → throws ───────────────────────────────────────────

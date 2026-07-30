@@ -1,4 +1,4 @@
-// ── Share Link Response ─────────────────────────────────────────────────────
+// ── Share Link Response (base) ──────────────────────────────────────────────
 
 export interface ShareReportResponse {
   success: boolean;
@@ -66,4 +66,100 @@ export interface SharedReportFullData {
 export interface GetSharedReportFullResponse {
   success: boolean;
   data: SharedReportFullData;
+}
+
+// ── Collection Share ────────────────────────────────────────────────────────
+
+/** Minimal report data shown in a shared collection preview */
+export interface SharedCollectionReportItem {
+  id: string;
+  type: string;
+  status: string;
+  overallScore: number | null;
+  auspiciousnessLevel: string | null;
+  overview: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  photos: unknown;
+  createdAt: Date;
+}
+
+export interface SharedCollectionPreview {
+  token: string;
+  sharedBy: {
+    name: string | null;
+    profilePictureURL: string | null;
+  };
+  collection: {
+    id: string;
+    name: string;
+    type: string;
+    description: string | null;
+    reportCount: number;
+  };
+  createdAt: Date;
+}
+
+export interface GetSharedCollectionPreviewResponse {
+  success: boolean;
+  data: SharedCollectionPreview;
+}
+
+export interface SharedCollectionFullData {
+  collection: {
+    id: string;
+    name: string;
+    type: string;
+    description: string | null;
+  };
+  reports: Record<string, unknown>[];
+  accessLevel: 'paid_full' | 'free_preview' | 'guest_preview';
+}
+
+export interface GetSharedCollectionFullResponse {
+  success: boolean;
+  data: SharedCollectionFullData;
+}
+
+// ── Comparison Share ────────────────────────────────────────────────────────
+
+export interface SharedComparisonReportItem {
+  id: string;
+  type: string;
+  overallScore: number | null;
+  auspiciousnessLevel: string | null;
+  overview: string | null;
+  address: string | null;
+  photos: unknown;
+  createdAt: Date;
+}
+
+export interface SharedComparisonPreview {
+  token: string;
+  sharedBy: {
+    name: string | null;
+    profilePictureURL: string | null;
+  };
+  comparison: {
+    report1: SharedComparisonReportItem;
+    report2: SharedComparisonReportItem;
+  };
+  createdAt: Date;
+}
+
+export interface GetSharedComparisonPreviewResponse {
+  success: boolean;
+  data: SharedComparisonPreview;
+}
+
+export interface SharedComparisonFullData {
+  report1: Record<string, unknown>;
+  report2: Record<string, unknown>;
+  accessLevel: 'paid_full' | 'free_preview' | 'guest_preview';
+}
+
+export interface GetSharedComparisonFullResponse {
+  success: boolean;
+  data: SharedComparisonFullData;
 }
