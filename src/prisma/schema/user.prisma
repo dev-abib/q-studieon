@@ -21,6 +21,7 @@ model User {
   stripeSubscriptionId   String?
   currentPeriodEnd       Int?
   role                   role                @default(user)
+  userRole               userRole?           @map("user_role")
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   termsAndConditions     Boolean             @default(false)
@@ -66,4 +67,18 @@ enum role {
   user
   admin
   super_admin
+}
+
+enum userRole {
+  buyer
+  seller
+  renter
+  real_estate_agent
+  brokerage
+  practitioner
+  home_explorer
+  homeowner
+  investor
+  interior_designer
+  architect
 }

@@ -1,6 +1,13 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MinLength,
+  IsEnum,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AtLeastOneField } from '../../auth/decorators/at-least-one-filed.dto';
+import { userRole } from '@prisma/client';
 
 export class UpdateUserDto {
   @AtLeastOneField()
@@ -20,4 +27,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiPropertyOptional({
+    example: 'buyer',
+    description:
+      'User role: buyer, seller, renter, real_estate_agent, brokerage, practitioner, home_explorer, homeowner, investor, interior_designer, architect',
+    enum: userRole,
+  })
+  @IsOptional()
+  @IsEnum(userRole, { message: 'Invalid user role' })
+  userRole?: userRole;
 }

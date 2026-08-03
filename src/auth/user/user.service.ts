@@ -179,6 +179,7 @@ export class UserService {
             otpExpires: otpExpiry,
             termsAndConditions: dto.termsAndConditions,
             role: 'user',
+            userRole: dto.userRole,
             otpAttempts: 0,
             isGuest: false,
             guestIp: null,
@@ -197,6 +198,7 @@ export class UserService {
             otpExpires: otpExpiry,
             termsAndConditions: dto.termsAndConditions,
             role: 'user',
+            userRole: dto.userRole,
             otpAttempts: 0,
           },
         });
@@ -235,6 +237,7 @@ export class UserService {
         profilePicture: user.profilePictureURL,
         id: user.id,
         isGuest: user.isGuest,
+        userRole: user.userRole,
       },
     };
   }

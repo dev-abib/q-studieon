@@ -68,6 +68,12 @@ export class UserController {
           example: 'newemail@example.com',
           description: 'User email address',
         },
+        userRole: {
+          type: 'string',
+          example: 'buyer',
+          description:
+            'User role: buyer, seller, renter, real_estate_agent, brokerage, practitioner, home_explorer, homeowner, investor, interior_designer, architect',
+        },
         profilePicture: {
           type: 'string',
           format: 'binary',

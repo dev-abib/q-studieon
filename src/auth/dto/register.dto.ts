@@ -8,9 +8,11 @@ import {
   IsBoolean,
   Equals,
   IsPhoneNumber,
+  IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Match } from '../decorators/match.decorator';
+import { userRole } from '@prisma/client';
 
 export class RegisterDto {
   @ApiPropertyOptional({
@@ -77,4 +79,14 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   guestId?: string;
+
+  @ApiPropertyOptional({
+    example: 'buyer',
+    description:
+      'User role: buyer, seller, renter, real_estate_agent, brokerage, practitioner, home_explorer, homeowner, investor, interior_designer, architect',
+    enum: userRole,
+  })
+  @IsOptional()
+  @IsEnum(userRole, { message: 'Invalid user role' })
+  userRole?: userRole;
 }
