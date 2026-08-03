@@ -21,6 +21,7 @@ import { CollectionModule } from './collection/collection.module';
 import { QuestionsModule } from './questions/questions.module';
 import { InsightModule } from './insight/insight.module';
 import { SharedReportModule } from './shared-report/shared-report.module';
+import { FaqModule } from './faq/faq.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { SharedReportModule } from './shared-report/shared-report.module';
     QuestionsModule,
     SharedReportModule,
     InsightModule,
+    FaqModule,
   ],
   controllers: [AppController, SubscriptionController],
   providers: [
