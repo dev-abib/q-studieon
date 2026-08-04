@@ -493,8 +493,7 @@ export class SharedReportService {
     );
 
     // Extract onsite capture data with photoUrls if this is an onsite report
-    const isPaid = accessLvl === 'paid_full';
-    const onsiteData = this.extractOnsiteCaptures(report.metadata, isPaid);
+    const onsiteData = this.extractOnsiteCaptures(report.metadata);
 
     return {
       success: true,
@@ -657,17 +656,16 @@ export class SharedReportService {
 
   /**
    * Extract onsite capture data (including photoUrls) from metadata JSON.
-   * Only returns data when isPaid is true (i.e., for paid_full access level).
+   * Available to all users (free, guest, and paid).
    */
   private extractOnsiteCaptures(
     metadata: Prisma.JsonValue,
-    isPaid: boolean,
   ): {
     totalLevels?: number;
     totalCaptures?: number;
     captures?: SharedReportCapture[];
   } {
-    if (!isPaid || !metadata || typeof metadata !== 'object') {
+    if (!metadata || typeof metadata !== 'object') {
       return {};
     }
 

@@ -25,7 +25,6 @@ import {
   getAccessLevel,
   buildReportResponse,
 } from '../auth/helpers/report-response.helper';
-import { ReportAccessLevel } from '../auth/helpers/ai-helper';
 import type { JwtPayload } from '../auth/types/jwt.types';
 import type { MulterFile } from '../common/pipes/file-validation.pipe';
 
@@ -297,7 +296,6 @@ export class OnsiteReportService {
       saved,
       accessLevel,
     );
-    const isPaid = accessLevel === ReportAccessLevel.PAID_FULL;
 
     return {
       success: true,
@@ -305,9 +303,9 @@ export class OnsiteReportService {
       data: {
         report: reportData,
         accessLevel: accessLvl,
-        totalLevels: isPaid ? totalLevels : 0,
-        totalCaptures: isPaid ? totalCaptures : 0,
-        captures: isPaid ? typedCaptures : [],
+        totalLevels,
+        totalCaptures,
+        captures: typedCaptures,
       },
     };
   }
@@ -347,16 +345,15 @@ export class OnsiteReportService {
       data,
       accessLevel,
     );
-    const isPaid = accessLevel === ReportAccessLevel.PAID_FULL;
 
     return {
       success: true,
       data: {
         report: reportData,
         accessLevel: accessLvl,
-        totalLevels: isPaid ? meta.totalLevels : 0,
-        totalCaptures: isPaid ? meta.totalCaptures : 0,
-        captures: isPaid ? meta.captures : [],
+        totalLevels: meta.totalLevels,
+        totalCaptures: meta.totalCaptures,
+        captures: meta.captures,
       },
     };
   }

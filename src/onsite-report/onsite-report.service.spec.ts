@@ -232,13 +232,14 @@ describe('OnsiteReportService', () => {
       ],
     } as SubmitOnsiteReportDto;
 
-    it('returns success with report data', async () => {
+    it('returns success with report data including captures for free user', async () => {
       const result = await service.submitReport(validDto, mockUser);
       expect(result.success).toBe(true);
       expect(result.data.accessLevel).toBe('free_preview');
-      expect(result.data.totalLevels).toBe(0); // non-paid, so 0
-      expect(result.data.totalCaptures).toBe(0);
-      expect(result.data.captures).toEqual([]);
+      expect(result.data.totalLevels).toBe(1);
+      expect(result.data.totalCaptures).toBe(1);
+      expect(result.data.captures).toHaveLength(1);
+      expect(result.data.captures[0].captureType).toBe('front_entrance');
     });
 
     it('returns full data for paid user', async () => {
@@ -449,10 +450,12 @@ describe('OnsiteReportService', () => {
       expect(result.data.accessLevel).toBe('paid_full');
     });
 
-    it('returns gated data for non-paid user', async () => {
+    it('returns report data with captures for non-paid user', async () => {
       const result = await service.getReportById('rpt_001', mockUser);
       expect(result.data.accessLevel).toBe('free_preview');
-      expect(result.data.totalLevels).toBe(0);
+      expect(result.data.totalLevels).toBe(1);
+      expect(result.data.totalCaptures).toBe(1);
+      expect(result.data.captures).toHaveLength(1);
     });
 
     it('throws NotFoundException when report does not exist', async () => {

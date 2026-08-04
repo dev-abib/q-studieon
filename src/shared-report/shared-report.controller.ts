@@ -131,11 +131,11 @@ export class SharedReportController {
       'For **report** shares: returns the single report.\n' +
       'For **collection** shares: returns all reports in the collection.\n' +
       'For **comparison** shares: returns both compared reports.\n\n' +
-      'For **onsite property reports** viewed with `paid_full` access, the response includes:\n' +
+      'For **onsite property reports**, the response includes (for all users):\n' +
       '- `totalLevels` (number) — total number of levels surveyed\n' +
       '- `totalCaptures` (number) — total number of captures/elements\n' +
       '- `captures` (array) — each capture includes `photoUrls` (string[])\n\n' +
-      'For non-onsite reports or lower access levels, these fields are omitted.',
+      'For non-onsite reports, these fields are omitted.',
   })
   @ApiOkResponse({
     description:

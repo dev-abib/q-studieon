@@ -301,8 +301,8 @@ describe('SharedReportService', () => {
       expect(data.captures[2].photoUrls).toEqual([]);
     });
 
-    // ── Onsite report + free user → should NOT include captures ───────────
-    it('omits onsite captures for non-paid user', async () => {
+    // ── Onsite report + free user → should include captures ───────────────
+    it('includes onsite captures for non-paid user', async () => {
       prisma.sharedReport.findUnique.mockResolvedValue(
         makeShared(onsiteBaseReport),
       );
@@ -314,13 +314,13 @@ describe('SharedReportService', () => {
       const data = result.data as any;
 
       expect(data.accessLevel).toBe('free_preview');
-      expect(data.totalLevels).toBeUndefined();
-      expect(data.totalCaptures).toBeUndefined();
-      expect(data.captures).toBeUndefined();
+      expect(data.totalLevels).toBe(2);
+      expect(data.totalCaptures).toBe(3);
+      expect(data.captures).toHaveLength(3);
     });
 
-    // ── Onsite report + guest user → should NOT include captures ─────────
-    it('omits onsite captures for guest user', async () => {
+    // ── Onsite report + guest user → should include captures ─────────────
+    it('includes onsite captures for guest user', async () => {
       prisma.sharedReport.findUnique.mockResolvedValue(
         makeShared(onsiteBaseReport),
       );
@@ -331,7 +331,9 @@ describe('SharedReportService', () => {
       );
 
       expect((result.data as any).accessLevel).toBe('guest_preview');
-      expect((result.data as any).captures).toBeUndefined();
+      expect((result.data as any).totalLevels).toBe(2);
+      expect((result.data as any).totalCaptures).toBe(3);
+      expect((result.data as any).captures).toHaveLength(3);
     });
 
     // ── Non-onsite report + paid user → should NOT include captures ───────
