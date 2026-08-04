@@ -16,10 +16,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
-  ApiQuery,
   ApiParam,
-  ApiConsumes,
-  ApiBody,
 } from '@nestjs/swagger';
 import { Auth } from '../auth/decorators/auth.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -33,7 +30,6 @@ import {
   FileValidationPipe,
   type MulterFile,
 } from '../common/pipes/file-validation.pipe';
-import { Public } from '../auth/decorators/public.decorator';
 import { UserService } from '../user/user.service';
 import { AdminMailDto } from '../auth/dto/admin.mail.dto';
 
@@ -136,12 +132,11 @@ export class AdminController {
 
   // get dashboard analytics
   @Get('dashboard-analytics')
-  // @Auth('admin')
-  @Public()
+  @Auth('admin')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Get dashboard analytics (public)' })
-  getDashboardAnalytics() {
-    return this.adminService.getDashboardAnalytics();
+  @ApiOperation({ summary: 'Get dashboard analytics (admin only)' })
+  getDashboardAnalytics(@CurrentUser() user: JwtPayload) {
+    return this.adminService.getDashboardAnalytics(user);
   }
 
   // send admin mail

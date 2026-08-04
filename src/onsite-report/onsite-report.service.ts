@@ -401,5 +401,4 @@ export class OnsiteReportService {
       message: 'On-site report deleted successfully.',
     };
   }
-
 }

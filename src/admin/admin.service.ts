@@ -282,8 +282,9 @@ export class AdminService {
     };
   }
 
-  async getDashboardAnalytics() {
+  async getDashboardAnalytics(user: JwtPayload) {
     const now = new Date();
+    const isSuperAdmin = user.role === 'super_admin';
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const startOfToday = new Date(
@@ -302,7 +303,7 @@ export class AdminService {
       return Math.round(((current - previous) / previous) * 100);
     };
 
-    // ── stat cards (keep as one Promise.all — only 13 queries, fine) ──────────
+    // ── stat cards (keep as one Promise.all — only 14 queries, fine) ──────────
     const [
       totalUsers,
       usersThisMonth,
@@ -317,6 +318,7 @@ export class AdminService {
       yearlyPlanCount,
       monthlyRevenue,
       yearlyRevenue,
+      userRoleDistribution,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({
@@ -357,30 +359,41 @@ export class AdminService {
           status: { in: ['active', 'trialing'] },
         },
       }),
-      this.prisma.payment.aggregate({
-        where: { status: 'succeeded', billingCycle: 'monthly' },
-        _sum: { amount: true },
-      }),
-      this.prisma.payment.aggregate({
-        where: { status: 'succeeded', billingCycle: 'yearly' },
-        _sum: { amount: true },
+      isSuperAdmin
+        ? this.prisma.payment.aggregate({
+            where: { status: 'succeeded', billingCycle: 'monthly' },
+            _sum: { amount: true },
+          })
+        : Promise.resolve({ _sum: { amount: null as number | null } }),
+      isSuperAdmin
+        ? this.prisma.payment.aggregate({
+            where: { status: 'succeeded', billingCycle: 'yearly' },
+            _sum: { amount: true },
+          })
+        : Promise.resolve({ _sum: { amount: null as number | null } }),
+      this.prisma.user.groupBy({
+        by: ['userRole'],
+        where: { userRole: { not: null } },
+        _count: { _all: true },
       }),
     ]);
 
-    // ── revenue chart — sequential, 1 query at a time ────────────────────────
+    // ── revenue chart — sequential, 1 query at a time (super admin only) ──────
     const revenueChart: { month: string; revenue: number }[] = [];
-    for (let i = 0; i < 6; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1);
-      const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-      const result = await this.prisma.payment.aggregate({
-        where: { status: 'succeeded', createdAt: { gte: start, lt: end } },
-        _sum: { amount: true },
-      });
-      revenueChart.push({
-        month: date.toLocaleString('default', { month: 'short' }),
-        revenue: Math.round((result._sum.amount ?? 0) / 100),
-      });
+    if (isSuperAdmin) {
+      for (let i = 0; i < 6; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        const start = new Date(date.getFullYear(), date.getMonth(), 1);
+        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+        const result = await this.prisma.payment.aggregate({
+          where: { status: 'succeeded', createdAt: { gte: start, lt: end } },
+          _sum: { amount: true },
+        });
+        revenueChart.push({
+          month: date.toLocaleString('default', { month: 'short' }),
+          revenue: Math.round((result._sum.amount ?? 0) / 100),
+        });
+      }
     }
 
     // ── reports chart — sequential, 1 query at a time ─────────────────────────
@@ -438,39 +451,41 @@ export class AdminService {
       });
     }
 
-    // ── revenue breakdown chart — sequential, 2 queries per iteration ─────────
+    // ── revenue breakdown chart — sequential (super admin only) ───────────────
     const revenueBreakdownChart: {
       month: string;
       monthly: number;
       yearly: number;
     }[] = [];
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1);
-      const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-      const [monthly, yearly] = await Promise.all([
-        this.prisma.payment.aggregate({
-          where: {
-            status: 'succeeded',
-            billingCycle: 'monthly',
-            createdAt: { gte: start, lt: end },
-          },
-          _sum: { amount: true },
-        }),
-        this.prisma.payment.aggregate({
-          where: {
-            status: 'succeeded',
-            billingCycle: 'yearly',
-            createdAt: { gte: start, lt: end },
-          },
-          _sum: { amount: true },
-        }),
-      ]);
-      revenueBreakdownChart.push({
-        month: date.toLocaleString('default', { month: 'short' }),
-        monthly: Math.round((monthly._sum.amount ?? 0) / 100),
-        yearly: Math.round((yearly._sum.amount ?? 0) / 100),
-      });
+    if (isSuperAdmin) {
+      for (let i = 0; i < 12; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+        const start = new Date(date.getFullYear(), date.getMonth(), 1);
+        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+        const [monthly, yearly] = await Promise.all([
+          this.prisma.payment.aggregate({
+            where: {
+              status: 'succeeded',
+              billingCycle: 'monthly',
+              createdAt: { gte: start, lt: end },
+            },
+            _sum: { amount: true },
+          }),
+          this.prisma.payment.aggregate({
+            where: {
+              status: 'succeeded',
+              billingCycle: 'yearly',
+              createdAt: { gte: start, lt: end },
+            },
+            _sum: { amount: true },
+          }),
+        ]);
+        revenueBreakdownChart.push({
+          month: date.toLocaleString('default', { month: 'short' }),
+          monthly: Math.round((monthly._sum.amount ?? 0) / 100),
+          yearly: Math.round((yearly._sum.amount ?? 0) / 100),
+        });
+      }
     }
 
     // ── totals & growth ───────────────────────────────────────────────────────
@@ -488,6 +503,94 @@ export class AdminService {
     );
     const totalRevenue = totalMonthlyRevenue + totalYearlyRevenue;
     const totalPaidUsers = monthlyPlanCount + yearlyPlanCount;
+
+    // ── user role distribution (profile roles) ───────────────────────────────
+    const totalRoleUsers = userRoleDistribution.reduce(
+      (sum, item) => sum + item._count._all,
+      0,
+    );
+    const userRoles = userRoleDistribution
+      .map((item) => ({
+        role: item.userRole ?? 'unassigned',
+        count: item._count._all,
+        percent:
+          totalRoleUsers > 0
+            ? Math.round((item._count._all / totalRoleUsers) * 100)
+            : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // ── user role monthly trend — sequential, 1 query per month ──────────────
+    const roleTrendByMonth: {
+      month: string;
+      counts: Record<string, number>;
+    }[] = [];
+    for (let i = 0; i < 6; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const start = new Date(date.getFullYear(), date.getMonth(), 1);
+      const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+      const rows = await this.prisma.user.groupBy({
+        by: ['userRole'],
+        where: {
+          userRole: { not: null },
+          createdAt: { gte: start, lt: end },
+        },
+        _count: { _all: true },
+      });
+      const counts: Record<string, number> = {};
+      for (const row of rows) {
+        if (row.userRole) counts[row.userRole] = row._count._all;
+      }
+      roleTrendByMonth.push({
+        month: date.toLocaleString('default', { month: 'short' }),
+        counts,
+      });
+    }
+
+    // all roles present in the window, ordered by total registrations
+    const roleTotals: Record<string, number> = {};
+    for (const month of roleTrendByMonth) {
+      for (const [role, count] of Object.entries(month.counts)) {
+        roleTotals[role] = (roleTotals[role] ?? 0) + count;
+      }
+    }
+    const allTrendRoles = Object.keys(roleTotals).sort(
+      (a, b) => (roleTotals[b] ?? 0) - (roleTotals[a] ?? 0),
+    );
+
+    type RoleTrendPoint = { month: string; [key: string]: string | number };
+
+    const userRoleTrendChart: RoleTrendPoint[] = roleTrendByMonth.map(
+      (month) => {
+        const point: RoleTrendPoint = { month: month.month };
+        for (const role of allTrendRoles) {
+          point[role] = month.counts[role] ?? 0;
+        }
+        return point;
+      },
+    );
+
+    // revenue is only exposed to super admins
+    const charts: {
+      reportsChart: { date: string; count: number }[];
+      userStatsChart: { month: string; registered: number; guests: number }[];
+      userRoleTrendChart?: RoleTrendPoint[];
+      revenueChart?: { month: string; revenue: number }[];
+      revenueBreakdownChart?: {
+        month: string;
+        monthly: number;
+        yearly: number;
+      }[];
+    } = {
+      reportsChart,
+      userStatsChart,
+      userRoleTrendChart,
+    };
+
+    if (isSuperAdmin) {
+      charts.revenueChart = revenueChart;
+      charts.revenueBreakdownChart = revenueBreakdownChart;
+    }
 
     return {
       success: true,
@@ -522,25 +625,26 @@ export class AdminService {
                 : 0,
           },
         },
-        revenueBreakdown: {
-          totalRevenue,
-          monthlyBilling: totalMonthlyRevenue,
-          yearlyBilling: totalYearlyRevenue,
-          monthlyPercent:
-            totalRevenue > 0
-              ? Math.round((totalMonthlyRevenue / totalRevenue) * 100)
-              : 0,
-          yearlyPercent:
-            totalRevenue > 0
-              ? Math.round((totalYearlyRevenue / totalRevenue) * 100)
-              : 0,
+        userRoles: {
+          total: totalRoleUsers,
+          distribution: userRoles,
         },
-        charts: {
-          revenueChart,
-          reportsChart,
-          userStatsChart,
-          revenueBreakdownChart,
-        },
+        ...(isSuperAdmin && {
+          revenueBreakdown: {
+            totalRevenue,
+            monthlyBilling: totalMonthlyRevenue,
+            yearlyBilling: totalYearlyRevenue,
+            monthlyPercent:
+              totalRevenue > 0
+                ? Math.round((totalMonthlyRevenue / totalRevenue) * 100)
+                : 0,
+            yearlyPercent:
+              totalRevenue > 0
+                ? Math.round((totalYearlyRevenue / totalRevenue) * 100)
+                : 0,
+          },
+        }),
+        charts,
       },
     };
   }

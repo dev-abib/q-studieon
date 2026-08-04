@@ -8,12 +8,7 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { Public } from '../decorators/public.decorator';
 import { AdminLoginDto } from '../dto/admin-login.dto';
@@ -76,6 +71,20 @@ export class AdminController {
     return {
       message: result.message,
       data: null,
+    };
+  }
+
+  // clear session controller (public — clears stale httpOnly cookies so a
+  // fully-expired session can't bounce between /dashboard and /login)
+  @Post('clear-session')
+  @Public()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Clear auth cookies for an expired session' })
+  clearSession(@Res({ passthrough: true }) res: Response) {
+    CookieHelper.clearAdminAuthCookies(res);
+
+    return {
+      message: 'Session cleared successfully',
     };
   }
 
