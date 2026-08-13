@@ -1,4 +1,4 @@
-import { Response, CookieOptions } from 'express';
+import type { Response, CookieOptions } from 'express';
 
 const MS_MULTIPLIERS: Record<string, number> = {
   ms: 1,
@@ -14,19 +14,34 @@ function durationToMs(value: string | undefined, fallbackMs: number): number {
   if (!value) return fallbackMs;
   const match = /^(\d+)\s*(ms|s|m|h|d|w)$/i.exec(value.trim());
   if (!match) return fallbackMs;
-  return Number(match[1]) * (MS_MULTIPLIERS[match[2]] ?? 1);
+  return Number(match[1]) * (MS_MULTIPLIERS[match[2].toLowerCase()] ?? 1);
 }
 
 export class CookieHelper {
-  private static getCookieOptions(): CookieOptions {
-    const isProd = process.env.NODE_ENV === 'production';
+  private static getCookieOptions(res?: Response): CookieOptions {
+    const host = res?.req?.headers?.host || '';
+    const origin = (res?.req?.headers?.origin as string) || '';
+    const isLocal =
+      host.includes('localhost') ||
+      host.includes('127.0.0.1') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1');
+
+    const isProd = process.env.NODE_ENV === 'production' && !isLocal;
+
+    // For local development we need SameSite=lax and secure=false.
+    // Modern browsers reject SameSite=None when secure is false.
+    const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
+    const secure = isProd; // secure only in production
 
     return {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: secure,
+      sameSite: sameSite,
       path: '/',
-      domain: isProd ? '.dwellr.tech' : undefined,
+      domain: isProd
+        ? process.env.COOKIE_DOMAIN || '.dwellr.tech'
+        : process.env.COOKIE_DOMAIN || undefined,
     };
   }
 
@@ -35,11 +50,9 @@ export class CookieHelper {
     accessToken: string,
     refreshToken: string,
   ) {
-    const options = this.getCookieOptions();
+    const options = this.getCookieOptions(res);
 
     // keep cookie lifetimes in sync with the JWT expiry env vars
-    // (previously the access cookie was hardcoded to 15 minutes, which logged
-    // admins out long before the 8h JWT actually expired)
     const accessMaxAge = durationToMs(
       process.env.JWT_ADMIN_EXPIRES_IN,
       15 * 60 * 1000,
@@ -61,50 +74,9 @@ export class CookieHelper {
   }
 
   static clearAdminAuthCookies(res: Response) {
-    const options = this.getCookieOptions();
+    const options = this.getCookieOptions(res);
 
     res.clearCookie('accessToken', options);
     res.clearCookie('refreshToken', options);
   }
 }
-
-// import { Response, CookieOptions } from 'express';
-
-// export class CookieHelper {
-//   private static getCookieOptions(): CookieOptions {
-//     const isProd = process.env.NODE_ENV === 'production';
-
-//     return {
-//       httpOnly: true,
-//       secure: isProd, // false on localhost (no HTTPS)
-//       sameSite: isProd ? 'none' : 'lax', // 'lax' works for localhost:3000 <-> localhost:4000
-//       path: '/',
-//       domain: undefined, // never set a domain for localhost
-//     };
-//   }
-
-//   static setAdminAuthCookies(
-//     res: Response,
-//     accessToken: string,
-//     refreshToken: string,
-//   ) {
-//     const options = this.getCookieOptions();
-
-//     res.cookie('accessToken', accessToken, {
-//       ...options,
-//       maxAge: 15 * 60 * 1000,
-//     });
-
-//     res.cookie('refreshToken', refreshToken, {
-//       ...options,
-//       maxAge: 7 * 24 * 60 * 60 * 1000,
-//     });
-//   }
-
-//   static clearAdminAuthCookies(res: Response) {
-//     const options = this.getCookieOptions();
-
-//     res.clearCookie('accessToken', options);
-//     res.clearCookie('refreshToken', options);
-//   }
-// }

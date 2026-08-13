@@ -7,13 +7,20 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { AUTH_TYPE_KEY } from '../decorators/auth.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { NO_GUEST_KEY } from '../decorators/no-guest.decorator';
 import { JwtPayload } from './../types/jwt.types';
 
-type AuthType = 'user' | 'admin' | 'super_admin' | 'reset';
+type AuthType =
+  | 'user'
+  | 'admin'
+  | 'super_admin'
+  | 'customer_support'
+  | 'content_manager'
+  | 'finance'
+  | 'reset';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -67,11 +74,34 @@ export class AuthGuard implements CanActivate {
     }
 
     // Role checks
-    if (
-      authType === 'admin' &&
-      !['admin', 'super_admin'].includes(decoded.role)
-    ) {
+    const staffRoles = [
+      'admin',
+      'super_admin',
+      'customer_support',
+      'content_manager',
+      'finance',
+    ];
+
+    if (authType === 'admin' && !staffRoles.includes(decoded.role)) {
       throw new UnauthorizedException('Admin access required');
+    }
+    if (
+      authType === 'customer_support' &&
+      !['admin', 'super_admin', 'customer_support'].includes(decoded.role)
+    ) {
+      throw new UnauthorizedException('Customer support access required');
+    }
+    if (
+      authType === 'content_manager' &&
+      !['admin', 'super_admin', 'content_manager'].includes(decoded.role)
+    ) {
+      throw new UnauthorizedException('Content manager access required');
+    }
+    if (
+      authType === 'finance' &&
+      !['admin', 'super_admin', 'finance'].includes(decoded.role)
+    ) {
+      throw new UnauthorizedException('Finance access required');
     }
     if (authType === 'super_admin' && decoded.role !== 'super_admin') {
       throw new UnauthorizedException('Super admin access required');
@@ -114,7 +144,15 @@ export class AuthGuard implements CanActivate {
   }
 
   private isAuthType(value: unknown): value is AuthType {
-    return ['user', 'admin', 'super_admin', 'reset'].includes(value as string);
+    return [
+      'user',
+      'admin',
+      'super_admin',
+      'customer_support',
+      'content_manager',
+      'finance',
+      'reset',
+    ].includes(value as string);
   }
 
   private getSecret(type: AuthType): string {
@@ -122,6 +160,9 @@ export class AuthGuard implements CanActivate {
       user: process.env.JWT_ACCESS_SECRET,
       admin: process.env.JWT_ADMIN_SECRET,
       super_admin: process.env.JWT_ADMIN_SECRET,
+      customer_support: process.env.JWT_ADMIN_SECRET,
+      content_manager: process.env.JWT_ADMIN_SECRET,
+      finance: process.env.JWT_ADMIN_SECRET,
       reset: process.env.JWT_RESET_SECRET,
     };
 

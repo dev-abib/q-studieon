@@ -9,6 +9,7 @@ import {
   Post,
   Put,
   Query,
+  UnauthorizedException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -32,6 +33,13 @@ import {
 } from '../common/pipes/file-validation.pipe';
 import { UserService } from '../user/user.service';
 import { AdminMailDto } from '../auth/dto/admin.mail.dto';
+import { Public } from '../auth/decorators/public.decorator';
+import { InviteAdminDto } from './dto/invite-admin.dto';
+import { AcceptInviteDto } from './dto/accept-invite.dto';
+import {
+  AdminForgotPasswordDto,
+  AdminResetPasswordDto,
+} from './dto/admin-password.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -127,6 +135,11 @@ export class AdminController {
   @ApiOperation({ summary: 'Delete a user by ID (admin only)' })
   @ApiParam({ name: 'id', description: 'User ID' })
   deleteUser(@Param('id') id: string, @CurrentUser() admin: JwtPayload) {
+    if (admin.role === 'customer_support') {
+      throw new UnauthorizedException(
+        'Customer support members cannot delete users',
+      );
+    }
     return this.adminService.deleteAdminOrUser(id, false, admin);
   }
 
@@ -146,5 +159,47 @@ export class AdminController {
   @ApiOperation({ summary: 'Send an email from admin to a user' })
   sendAdminMail(@Body() dto: AdminMailDto, @CurrentUser() admin: JwtPayload) {
     return this.adminService.sendAdminMail(dto, admin);
+  }
+
+  @Post('invite-member')
+  @HttpCode(201)
+  @Auth('super_admin')
+  @ApiOperation({
+    summary: 'Invite a new team member via email (super admin only)',
+  })
+  inviteMember(@Body() dto: InviteAdminDto, @CurrentUser() admin: JwtPayload) {
+    return this.adminService.inviteTeamMember(dto, admin);
+  }
+
+  @Get('verify-invite')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: 'Verify invitation token' })
+  verifyInviteToken(@Query('token') token: string) {
+    return this.adminService.verifyInviteToken(token);
+  }
+
+  @Post('accept-invite')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: 'Accept invitation and create password' })
+  acceptInvite(@Body() dto: AcceptInviteDto) {
+    return this.adminService.acceptInvite(dto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: 'Request admin password reset link' })
+  forgotPassword(@Body() dto: AdminForgotPasswordDto) {
+    return this.adminService.adminForgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  @Public()
+  @ApiOperation({ summary: 'Reset admin password using token' })
+  resetPassword(@Body() dto: AdminResetPasswordDto) {
+    return this.adminService.adminResetPassword(dto);
   }
 }

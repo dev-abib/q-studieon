@@ -119,8 +119,7 @@ export class AdminController {
   ) {
     await this.adminService.changePassword(dto, user.id);
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    CookieHelper.clearAdminAuthCookies(res);
 
     return { message: 'Password changed successfully' };
   }

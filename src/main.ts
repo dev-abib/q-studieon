@@ -7,7 +7,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import helmet from 'helmet';
 import { setupSwagger } from './common/swagger/swagger.setup';
 import { join } from 'path';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -31,6 +31,8 @@ async function bootstrap() {
       'https://q-studieon-dashboard-next.vercel.app',
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3003',
       'http://localhost:4000',
       'http://localhost:4923',
       'http://localhost:5555',

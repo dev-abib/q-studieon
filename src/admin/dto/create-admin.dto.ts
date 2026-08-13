@@ -1,5 +1,6 @@
 import {
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   Matches,
@@ -47,6 +48,15 @@ export class CreateAdminDto {
   })
   @IsOptional()
   name: string;
+
+  @ApiPropertyOptional({
+    example: 'customer_support',
+    enum: ['admin', 'customer_support', 'content_manager', 'finance'],
+    description: 'Admin role',
+  })
+  @IsEnum(['admin', 'customer_support', 'content_manager', 'finance'])
+  @IsOptional()
+  role?: 'admin' | 'customer_support' | 'content_manager' | 'finance';
 
   @ApiPropertyOptional({
     example: 'guest_abc123',

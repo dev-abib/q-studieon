@@ -13,6 +13,15 @@ import { Prisma } from '@prisma/client';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { AuthHelper } from '../auth/helpers/auth.helper';
 import { UpdateAdminDto } from './dto/update-admin.dto';
+import { randomBytes } from 'crypto';
+import { InviteAdminDto } from './dto/invite-admin.dto';
+import { AcceptInviteDto } from './dto/accept-invite.dto';
+import {
+  AdminForgotPasswordDto,
+  AdminResetPasswordDto,
+} from './dto/admin-password.dto';
+import { inviteMemberTemplate } from '../infra/mail/templates/auth/invite-member.template';
+import { adminResetPasswordTemplate } from '../infra/mail/templates/auth/admin-reset-password.template';
 import { MulterFile } from '../common/pipes/file-validation.pipe';
 import { CloudinaryService } from '../common/services/cloudinary.service';
 import { EmailService } from '../infra/mail/mail.service';
@@ -76,7 +85,17 @@ export class AdminService {
       : 'createdAt';
 
     const where: Prisma.UserWhereInput = {
-      role: isAdmin ? 'admin' : 'user',
+      role: isAdmin
+        ? {
+            in: [
+              'admin',
+              'super_admin',
+              'customer_support',
+              'content_manager',
+              'finance',
+            ],
+          }
+        : 'user',
       ...(search && {
         OR: [
           { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
@@ -144,7 +163,7 @@ export class AdminService {
         name: dto.name,
         email: dto.email,
         password: hashedPassword,
-        role: 'admin',
+        role: dto.role || 'admin',
         isOtpVerified: true,
         authProvider: 'local',
         termsAndConditions: true,
@@ -217,9 +236,26 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
 
+    if (admin.isOwner) {
+      throw new BadRequestException(
+        'The primary Site Owner account cannot be deleted under any circumstances.',
+      );
+    }
+
     if (isAdminDelete && session.role !== 'super_admin') {
       throw new UnauthorizedException(
         `You don't have sufficient access to remove an admin`,
+      );
+    }
+
+    const requester = await this.userRepo.findUser('id', session.id);
+    if (
+      isAdminDelete &&
+      admin.role === 'super_admin' &&
+      !requester?.isOwner
+    ) {
+      throw new UnauthorizedException(
+        'Only the primary Site Owner can remove another Super Admin.',
       );
     }
 
@@ -284,7 +320,8 @@ export class AdminService {
 
   async getDashboardAnalytics(user: JwtPayload) {
     const now = new Date();
-    const isSuperAdmin = user.role === 'super_admin';
+    const isSuperAdmin =
+      user.role === 'super_admin' || user.role === 'finance';
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const startOfToday = new Date(
@@ -666,6 +703,183 @@ export class AdminService {
 
     return {
       message: `Successfully sent admin mail`,
+    };
+  }
+
+  // Invite team member via email
+  async inviteTeamMember(dto: InviteAdminDto, inviter: JwtPayload) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(
+        'A user with this email address already exists.',
+      );
+    }
+
+    // Delete existing pending invitation if any
+    await this.prisma.invitation.deleteMany({
+      where: { email: dto.email },
+    });
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    await this.prisma.invitation.create({
+      data: {
+        email: dto.email,
+        role: dto.role,
+        token,
+        invitedBy: inviter.email,
+        expiresAt,
+      },
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const inviteLink = `${frontendUrl}/auth/accept-invite?token=${token}`;
+
+    await this.email.sendEmail({
+      to: dto.email,
+      subject: `You're invited to join Dwellr as ${dto.role.replace('_', ' ')}`,
+      html: inviteMemberTemplate({
+        email: dto.email,
+        role: dto.role,
+        inviteLink,
+        invitedByName: inviter.name || 'Site Admin',
+      }),
+    });
+
+    return {
+      message: `Invitation email sent successfully to ${dto.email}`,
+    };
+  }
+
+  // Verify invitation token
+  async verifyInviteToken(token: string) {
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { token },
+    });
+
+    if (!invitation || invitation.expiresAt < new Date()) {
+      throw new BadRequestException(
+        'Invitation token is invalid or has expired.',
+      );
+    }
+
+    return {
+      email: invitation.email,
+      role: invitation.role,
+    };
+  }
+
+  // Accept invitation & complete setup
+  async acceptInvite(dto: AcceptInviteDto) {
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { token: dto.token },
+    });
+
+    if (!invitation || invitation.expiresAt < new Date()) {
+      throw new BadRequestException(
+        'Invitation token is invalid or has expired.',
+      );
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: invitation.email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(
+        'An account with this email already exists.',
+      );
+    }
+
+    const hashedPassword = await this.auth.hashPassword(dto.password);
+
+    await this.prisma.user.create({
+      data: {
+        email: invitation.email,
+        name: dto.name,
+        password: hashedPassword,
+        role: invitation.role,
+        isOtpVerified: true,
+        authProvider: 'local',
+        termsAndConditions: true,
+        isPaid: false,
+        isGuest: false,
+      },
+    });
+
+    // Remove consumed invitation
+    await this.prisma.invitation.delete({
+      where: { token: dto.token },
+    });
+
+    return {
+      message: 'Account activated successfully. You can now log in.',
+    };
+  }
+
+  // Admin forgot password
+  async adminForgotPassword(dto: AdminForgotPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user || user.role === 'user') {
+      throw new BadRequestException(
+        'No admin account found with this email address.',
+      );
+    }
+
+    const token = randomBytes(32).toString('hex');
+    await this.prisma.user.update({
+      where: { email: dto.email },
+      data: { resetToken: token },
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/auth/reset-password?token=${token}`;
+
+    await this.email.sendEmail({
+      to: dto.email,
+      subject: `Reset Your Dwellr Admin Password`,
+      html: adminResetPasswordTemplate({
+        name: user.name || 'Admin',
+        resetLink,
+      }),
+    });
+
+    return {
+      message: 'Password reset link has been sent to your email.',
+    };
+  }
+
+  // Admin reset password
+  async adminResetPassword(dto: AdminResetPasswordDto) {
+    const user = await this.prisma.user.findFirst({
+      where: { resetToken: dto.token },
+    });
+
+    if (!user || !dto.token) {
+      throw new BadRequestException(
+        'Password reset token is invalid or has expired.',
+      );
+    }
+
+    const hashedPassword = await this.auth.hashPassword(dto.newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+      },
+    });
+
+    return {
+      message: 'Password reset successfully. You can now log in.',
     };
   }
 }

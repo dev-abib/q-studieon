@@ -29,6 +29,7 @@ model User {
   guestIp                String?
   guestDeviceId          String?
   isResetRequest         Boolean?            @default(false)
+  isOwner                Boolean             @default(false)
   collections            Collection[]
   payments               Payment[]
   reports                Report[]
@@ -40,6 +41,20 @@ model User {
   @@index([status])
   @@index([isPaid])
   @@map("users")
+}
+
+model Invitation {
+  id        String   @id @default(uuid())
+  email     String
+  role      role
+  token     String   @unique
+  invitedBy String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@map("invitations")
 }
 
 enum AuthProvider {
@@ -67,6 +82,9 @@ enum role {
   user
   admin
   super_admin
+  customer_support
+  content_manager
+  finance
 }
 
 enum userRole {
