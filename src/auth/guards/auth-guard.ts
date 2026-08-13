@@ -12,6 +12,7 @@ import { AUTH_TYPE_KEY } from '../decorators/auth.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { NO_GUEST_KEY } from '../decorators/no-guest.decorator';
 import { JwtPayload } from './../types/jwt.types';
+import { PrismaService } from '../../prisma/prisma.service';
 
 type AuthType =
   | 'user'
@@ -27,9 +28,10 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
     private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic: boolean = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -63,6 +65,30 @@ export class AuthGuard implements CanActivate {
     if (!this.isJwtPayload(decoded)) {
       throw new UnauthorizedException('Malformed token payload');
     }
+
+    // ── Guest server-side expiry check ────────────────────────────────
+    // JWT expiry alone is not enough: the cron soft-blocks guests by
+    // flipping isGuest → false in the DB. We do one lightweight DB read
+    // only for guest tokens to enforce that block immediately.
+    if (decoded.isGuest === true) {
+      const guestRecord = await this.prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { isGuest: true, guestExpiresAt: true },
+      });
+
+      const isExpired =
+        !guestRecord ||
+        !guestRecord.isGuest ||
+        (guestRecord.guestExpiresAt !== null &&
+          guestRecord.guestExpiresAt < new Date());
+
+      if (isExpired) {
+        throw new UnauthorizedException(
+          'Guest session has expired. Please sign up to continue.',
+        );
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────
 
     const noGuest: boolean = this.reflector.getAllAndOverride(NO_GUEST_KEY, [
       context.getHandler(),

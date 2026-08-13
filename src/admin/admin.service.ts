@@ -9,7 +9,7 @@ import { JwtPayload } from '../auth/types/jwt.types';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { UserRepository } from '../common/repositories/user.repository';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, userRole } from '@prisma/client';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { AuthHelper } from '../auth/helpers/auth.helper';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -340,100 +340,105 @@ export class AdminService {
       return Math.round(((current - previous) / previous) * 100);
     };
 
-    // ── stat cards (keep as one Promise.all — only 14 queries, fine) ──────────
+    // Date range boundaries for bulk dataset queries
+    const startOf14DaysAgo = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 13,
+    );
+    const startOf6MonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const startOf12MonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
     const [
-      totalUsers,
-      usersThisMonth,
-      usersLastMonth,
-      activeSubscriptions,
-      subscriptionsThisMonth,
-      subscriptionsLastMonth,
-      guestUsers,
-      reportsToday,
-      reportsYesterday,
-      monthlyPlanCount,
-      yearlyPlanCount,
-      monthlyRevenue,
-      yearlyRevenue,
-      userRoleDistribution,
+      [totalUsers, usersThisMonth, usersLastMonth, activeSubscriptions],
+      [subscriptionsThisMonth, subscriptionsLastMonth, guestUsers, reportsToday],
+      [reportsYesterday, monthlyPlanCount, yearlyPlanCount, monthlyRevenue],
+      [yearlyRevenue, userRoleDistribution],
+      reportsList,
+      users6m,
+      payments12m,
     ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({
-        where: { createdAt: { gte: startOfThisMonth } },
+      Promise.all([
+        this.prisma.user.count(),
+        this.prisma.user.count({
+          where: { createdAt: { gte: startOfThisMonth } },
+        }),
+        this.prisma.user.count({
+          where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
+        }),
+        this.prisma.user.count({
+          where: { status: { in: ['active', 'trialing'] } },
+        }),
+      ]),
+      Promise.all([
+        this.prisma.user.count({
+          where: {
+            status: { in: ['active', 'trialing'] },
+            createdAt: { gte: startOfThisMonth },
+          },
+        }),
+        this.prisma.user.count({
+          where: {
+            status: { in: ['active', 'trialing'] },
+            createdAt: { gte: startOfLastMonth, lt: startOfThisMonth },
+          },
+        }),
+        this.prisma.user.count({ where: { isGuest: true } }),
+        this.prisma.report.count({ where: { createdAt: { gte: startOfToday } } }),
+      ]),
+      Promise.all([
+        this.prisma.report.count({
+          where: { createdAt: { gte: startOfYesterday, lt: startOfToday } },
+        }),
+        this.prisma.user.count({
+          where: {
+            billingCycle: 'monthly',
+            status: { in: ['active', 'trialing'] },
+          },
+        }),
+        this.prisma.user.count({
+          where: {
+            billingCycle: 'yearly',
+            status: { in: ['active', 'trialing'] },
+          },
+        }),
+        isSuperAdmin
+          ? this.prisma.payment.aggregate({
+              where: { status: 'succeeded', billingCycle: 'monthly' },
+              _sum: { amount: true },
+            })
+          : Promise.resolve({ _sum: { amount: null as number | null } }),
+      ]),
+      Promise.all([
+        isSuperAdmin
+          ? this.prisma.payment.aggregate({
+              where: { status: 'succeeded', billingCycle: 'yearly' },
+              _sum: { amount: true },
+            })
+          : Promise.resolve({ _sum: { amount: null as number | null } }),
+        this.prisma.user.groupBy({
+          by: ['userRole'],
+          where: { userRole: { not: null } },
+          _count: { _all: true },
+        }),
+      ]),
+      this.prisma.report.findMany({
+        where: { createdAt: { gte: startOf14DaysAgo } },
+        select: { createdAt: true },
       }),
-      this.prisma.user.count({
-        where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
-      }),
-      this.prisma.user.count({
-        where: { status: { in: ['active', 'trialing'] } },
-      }),
-      this.prisma.user.count({
-        where: {
-          status: { in: ['active', 'trialing'] },
-          createdAt: { gte: startOfThisMonth },
-        },
-      }),
-      this.prisma.user.count({
-        where: {
-          status: { in: ['active', 'trialing'] },
-          createdAt: { gte: startOfLastMonth, lt: startOfThisMonth },
-        },
-      }),
-      this.prisma.user.count({ where: { isGuest: true } }),
-      this.prisma.report.count({ where: { createdAt: { gte: startOfToday } } }),
-      this.prisma.report.count({
-        where: { createdAt: { gte: startOfYesterday, lt: startOfToday } },
-      }),
-      this.prisma.user.count({
-        where: {
-          billingCycle: 'monthly',
-          status: { in: ['active', 'trialing'] },
-        },
-      }),
-      this.prisma.user.count({
-        where: {
-          billingCycle: 'yearly',
-          status: { in: ['active', 'trialing'] },
-        },
+      this.prisma.user.findMany({
+        where: { createdAt: { gte: startOf6MonthsAgo } },
+        select: { isGuest: true, userRole: true, createdAt: true },
       }),
       isSuperAdmin
-        ? this.prisma.payment.aggregate({
-            where: { status: 'succeeded', billingCycle: 'monthly' },
-            _sum: { amount: true },
+        ? this.prisma.payment.findMany({
+            where: { status: 'succeeded', createdAt: { gte: startOf12MonthsAgo } },
+            select: { amount: true, billingCycle: true, createdAt: true },
           })
-        : Promise.resolve({ _sum: { amount: null as number | null } }),
-      isSuperAdmin
-        ? this.prisma.payment.aggregate({
-            where: { status: 'succeeded', billingCycle: 'yearly' },
-            _sum: { amount: true },
-          })
-        : Promise.resolve({ _sum: { amount: null as number | null } }),
-      this.prisma.user.groupBy({
-        by: ['userRole'],
-        where: { userRole: { not: null } },
-        _count: { _all: true },
-      }),
+        : Promise.resolve([]),
     ]);
 
-    // ── revenue chart — sequential, 1 query at a time (super admin only) ──────
-    const revenueChart: { month: string; revenue: number }[] = [];
-    if (isSuperAdmin) {
-      for (let i = 0; i < 6; i++) {
-        const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-        const start = new Date(date.getFullYear(), date.getMonth(), 1);
-        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-        const result = await this.prisma.payment.aggregate({
-          where: { status: 'succeeded', createdAt: { gte: start, lt: end } },
-          _sum: { amount: true },
-        });
-        revenueChart.push({
-          month: date.toLocaleString('default', { month: 'short' }),
-          revenue: Math.round((result._sum.amount ?? 0) / 100),
-        });
-      }
-    }
-
-    // ── reports chart — sequential, 1 query at a time ─────────────────────────
+    // ── 1. Build Reports Chart (14 days) ─────────────────────────────────────
     const reportsChart: { date: string; count: number }[] = [];
     for (let i = 0; i < 14; i++) {
       const date = new Date(
@@ -445,15 +450,15 @@ export class AdminService {
         date.getFullYear(),
         date.getMonth(),
         date.getDate(),
-      );
+      ).getTime();
       const end = new Date(
         date.getFullYear(),
         date.getMonth(),
         date.getDate() + 1,
-      );
-      const count = await this.prisma.report.count({
-        where: { createdAt: { gte: start, lt: end } },
-      });
+      ).getTime();
+      const count = reportsList.filter(
+        (r) => r.createdAt.getTime() >= start && r.createdAt.getTime() < end,
+      ).length;
       reportsChart.push({
         date: date.toLocaleDateString('default', {
           month: 'short',
@@ -463,64 +468,107 @@ export class AdminService {
       });
     }
 
-    // ── user stats chart — sequential, 2 queries per iteration ───────────────
+    // ── 2. Build User Stats Chart & Role Trend Chart (6 months) ──────────────
     const userStatsChart: {
       month: string;
       registered: number;
       guests: number;
     }[] = [];
+    const roleTrendByMonth: {
+      month: string;
+      counts: Record<string, number>;
+    }[] = [];
+
     for (let i = 0; i < 6; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1);
-      const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-      const [registered, guests] = await Promise.all([
-        this.prisma.user.count({
-          where: { isGuest: false, createdAt: { gte: start, lt: end } },
-        }),
-        this.prisma.user.count({
-          where: { isGuest: true, createdAt: { gte: start, lt: end } },
-        }),
-      ]);
-      userStatsChart.push({
-        month: date.toLocaleString('default', { month: 'short' }),
-        registered,
-        guests,
-      });
+      const start = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        1,
+      ).getTime();
+      const end = new Date(
+        date.getFullYear(),
+        date.getMonth() + 1,
+        1,
+      ).getTime();
+      const monthLabel = date.toLocaleString('default', { month: 'short' });
+
+      const usersInMonth = users6m.filter(
+        (u) => u.createdAt.getTime() >= start && u.createdAt.getTime() < end,
+      );
+
+      const registered = usersInMonth.filter((u) => !u.isGuest).length;
+      const guests = usersInMonth.filter((u) => u.isGuest).length;
+      userStatsChart.push({ month: monthLabel, registered, guests });
+
+      const counts: Record<string, number> = Object.fromEntries(
+        Object.values(userRole).map((role) => [role, 0]),
+      );
+      for (const u of usersInMonth) {
+        if (u.userRole) counts[u.userRole] = (counts[u.userRole] ?? 0) + 1;
+      }
+      roleTrendByMonth.push({ month: monthLabel, counts });
     }
 
-    // ── revenue breakdown chart — sequential (super admin only) ───────────────
+    // ── 3. Build Revenue Chart (6m) & Revenue Breakdown (12m) ────────────────
+    const revenueChart: { month: string; revenue: number }[] = [];
     const revenueBreakdownChart: {
       month: string;
       monthly: number;
       yearly: number;
     }[] = [];
+
     if (isSuperAdmin) {
+      // 6 months revenue chart
+      for (let i = 0; i < 6; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        const start = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          1,
+        ).getTime();
+        const end = new Date(
+          date.getFullYear(),
+          date.getMonth() + 1,
+          1,
+        ).getTime();
+        const rev = payments12m
+          .filter(
+            (p) => p.createdAt.getTime() >= start && p.createdAt.getTime() < end,
+          )
+          .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+        revenueChart.push({
+          month: date.toLocaleString('default', { month: 'short' }),
+          revenue: Math.round(rev / 100),
+        });
+      }
+
+      // 12 months revenue breakdown chart
       for (let i = 0; i < 12; i++) {
         const date = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-        const start = new Date(date.getFullYear(), date.getMonth(), 1);
-        const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-        const [monthly, yearly] = await Promise.all([
-          this.prisma.payment.aggregate({
-            where: {
-              status: 'succeeded',
-              billingCycle: 'monthly',
-              createdAt: { gte: start, lt: end },
-            },
-            _sum: { amount: true },
-          }),
-          this.prisma.payment.aggregate({
-            where: {
-              status: 'succeeded',
-              billingCycle: 'yearly',
-              createdAt: { gte: start, lt: end },
-            },
-            _sum: { amount: true },
-          }),
-        ]);
+        const start = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          1,
+        ).getTime();
+        const end = new Date(
+          date.getFullYear(),
+          date.getMonth() + 1,
+          1,
+        ).getTime();
+        const monthPayments = payments12m.filter(
+          (p) => p.createdAt.getTime() >= start && p.createdAt.getTime() < end,
+        );
+        const monthlySum = monthPayments
+          .filter((p) => p.billingCycle === 'monthly')
+          .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+        const yearlySum = monthPayments
+          .filter((p) => p.billingCycle === 'yearly')
+          .reduce((sum, p) => sum + (p.amount ?? 0), 0);
         revenueBreakdownChart.push({
           month: date.toLocaleString('default', { month: 'short' }),
-          monthly: Math.round((monthly._sum.amount ?? 0) / 100),
-          yearly: Math.round((yearly._sum.amount ?? 0) / 100),
+          monthly: Math.round(monthlySum / 100),
+          yearly: Math.round(yearlySum / 100),
         });
       }
     }
@@ -542,47 +590,28 @@ export class AdminService {
     const totalPaidUsers = monthlyPlanCount + yearlyPlanCount;
 
     // ── user role distribution (profile roles) ───────────────────────────────
-    const totalRoleUsers = userRoleDistribution.reduce(
-      (sum, item) => sum + item._count._all,
+    const userRoleCounts = new Map(
+      userRoleDistribution.map((item) => [item.userRole, item._count._all]),
+    );
+    const fullUserRoleDistribution = Object.values(userRole).map((role) => ({
+      role,
+      count: userRoleCounts.get(role) ?? 0,
+    }));
+
+    const totalRoleUsers = fullUserRoleDistribution.reduce(
+      (sum, item) => sum + item.count,
       0,
     );
-    const userRoles = userRoleDistribution
+    const userRoles = fullUserRoleDistribution
       .map((item) => ({
-        role: item.userRole ?? 'unassigned',
-        count: item._count._all,
+        role: item.role,
+        count: item.count,
         percent:
           totalRoleUsers > 0
-            ? Math.round((item._count._all / totalRoleUsers) * 100)
+            ? Math.round((item.count / totalRoleUsers) * 100)
             : 0,
       }))
       .sort((a, b) => b.count - a.count);
-
-    // ── user role monthly trend — sequential, 1 query per month ──────────────
-    const roleTrendByMonth: {
-      month: string;
-      counts: Record<string, number>;
-    }[] = [];
-    for (let i = 0; i < 6; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1);
-      const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-      const rows = await this.prisma.user.groupBy({
-        by: ['userRole'],
-        where: {
-          userRole: { not: null },
-          createdAt: { gte: start, lt: end },
-        },
-        _count: { _all: true },
-      });
-      const counts: Record<string, number> = {};
-      for (const row of rows) {
-        if (row.userRole) counts[row.userRole] = row._count._all;
-      }
-      roleTrendByMonth.push({
-        month: date.toLocaleString('default', { month: 'short' }),
-        counts,
-      });
-    }
 
     // all roles present in the window, ordered by total registrations
     const roleTotals: Record<string, number> = {};
