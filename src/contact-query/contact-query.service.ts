@@ -664,6 +664,7 @@ export class ContactQueryService {
         role: true,
         profilePictureURL: true,
         canDeleteQueries: true,
+        canViewUserDetails: true,
         isOwner: true,
       },
       orderBy: {
@@ -713,12 +714,61 @@ export class ContactQueryService {
         email: true,
         role: true,
         canDeleteQueries: true,
+        canViewUserDetails: true,
       },
     });
 
     return {
       success: true,
       message: `${updated.name || updated.email}'s delete permission set to ${canDelete ? 'ENABLED' : 'DISABLED'}.`,
+      data: updated,
+    };
+  }
+
+  // ─── 11.1 Super Admin: Toggle User Details Privilege for Staff ─────────────
+  async toggleStaffViewUserDetailsPermission(
+    targetStaffId: string,
+    canViewUserDetails: boolean,
+    currentAdmin: JwtPayload,
+  ) {
+    if (currentAdmin.role !== 'super_admin') {
+      const caller = await this.prisma.user.findUnique({
+        where: { id: currentAdmin.id },
+        select: { role: true, isOwner: true },
+      });
+      if (caller?.role !== 'super_admin' && !caller?.isOwner) {
+        throw new ForbiddenException(
+          'Permission Denied: Only Super Admins can grant or revoke user details viewing privileges.',
+        );
+      }
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetStaffId },
+    });
+
+    if (!target) {
+      throw new NotFoundException(`Staff member with ID "${targetStaffId}" not found.`);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetStaffId },
+      data: {
+        canViewUserDetails,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        canDeleteQueries: true,
+        canViewUserDetails: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: `${updated.name || updated.email}'s user details viewing permission set to ${canViewUserDetails ? 'ENABLED' : 'DISABLED'}.`,
       data: updated,
     };
   }

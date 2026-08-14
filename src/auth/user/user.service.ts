@@ -68,6 +68,81 @@ export class UserService {
     return new Date(Date.now() + time * 60 * 1000);
   }
 
+  parseUserAgent(userAgent?: string) {
+    if (!userAgent) return { browser: 'Unknown', os: 'Unknown', device: 'Desktop' };
+    const ua = userAgent.toLowerCase();
+
+    // OS
+    let os = 'Unknown';
+    if (ua.includes('windows nt 10.0')) os = 'Windows 10/11';
+    else if (ua.includes('windows')) os = 'Windows';
+    else if (ua.includes('macintosh') || ua.includes('mac os')) os = 'macOS';
+    else if (ua.includes('android')) os = 'Android';
+    else if (ua.includes('iphone')) os = 'iPhone';
+    else if (ua.includes('ipad')) os = 'iPad';
+    else if (ua.includes('linux')) os = 'Linux';
+
+    // Browser
+    let browser = 'Unknown';
+    if (ua.includes('edg/')) browser = 'Edge';
+    else if (ua.includes('chrome') && !ua.includes('edg')) browser = 'Chrome';
+    else if (ua.includes('safari') && !ua.includes('chrome')) browser = 'Safari';
+    else if (ua.includes('firefox')) browser = 'Firefox';
+    else if (ua.includes('opera') || ua.includes('opr/')) browser = 'Opera';
+
+    // Device
+    let device = 'Desktop';
+    if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) device = 'Mobile';
+    else if (ua.includes('ipad') || ua.includes('tablet')) device = 'Tablet';
+
+    return { browser, os, device };
+  }
+
+  async recordLoginSession(userId: string, ip?: string, userAgent?: string) {
+    const rawIp = ip || '127.0.0.1';
+    const cleanIp = rawIp.replace('::ffff:', '');
+    const { browser, os, device } = this.parseUserAgent(userAgent);
+
+    try {
+      // Mark previous active sessions as not current
+      await this.prisma.userSession.updateMany({
+        where: { userId, isCurrent: true },
+        data: { isCurrent: false },
+      });
+
+      // Create new session record
+      const session = await this.prisma.userSession.create({
+        data: {
+          userId,
+          ipAddress: cleanIp,
+          userAgent: userAgent || null,
+          browser,
+          os,
+          device,
+          loginAt: new Date(),
+          lastActiveAt: new Date(),
+          durationSeconds: 0,
+          isCurrent: true,
+        },
+      });
+
+      // Update User summary tracking fields
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastLoginAt: new Date(),
+          lastActiveIp: cleanIp,
+          loginCount: { increment: 1 },
+        },
+      });
+
+      return session;
+    } catch (e) {
+      console.error('Failed to record user login session:', e);
+      return null;
+    }
+  }
+
   // verify google access token
   private async verifyGoogleAccessToken(
     access_token: string,
@@ -243,7 +318,7 @@ export class UserService {
   }
 
   // verify account service
-  async verifyAccount(dto: VerifyAccountDto) {
+  async verifyAccount(dto: VerifyAccountDto, ip?: string, userAgent?: string) {
     const user = await this.userRepo.findUser('email', dto.email);
 
     if (user.isOtpVerified)
@@ -284,6 +359,9 @@ export class UserService {
       },
     });
 
+    // Record login session & IP
+    const session = await this.recordLoginSession(user.id, ip, userAgent);
+
     await this.email.sendEmail({
       to: user.email as string,
       subject: `Account verification confirmation ${process.env.MAIL_FROM_NAME as string}`,
@@ -309,12 +387,13 @@ export class UserService {
           refreshToken,
         },
         user: data,
+        sessionId: session?.id,
       },
     };
   }
 
   // login account service
-  async loginAccount(dto: LoginDto) {
+  async loginAccount(dto: LoginDto, ip?: string, userAgent?: string) {
     const user = await this.userRepo.findUser('email', dto.email);
 
     const isValidPass = await this.userRepo.comparePassword(
@@ -349,6 +428,9 @@ export class UserService {
       },
     });
 
+    // Record login session & IP
+    const session = await this.recordLoginSession(user.id, ip, userAgent);
+
     const data = {
       name: user.name,
       email: user.email,
@@ -363,6 +445,7 @@ export class UserService {
           refreshToken,
         },
         user: data,
+        sessionId: session?.id,
       },
     };
   }
@@ -700,6 +783,9 @@ export class UserService {
       data: { refreshToken: this.auth.hashToken(refreshToken) },
     });
 
+    // Record session
+    await this.recordLoginSession(user.id, normalizedIp, undefined);
+
     return {
       message: 'Guest login successful',
       data: {
@@ -712,7 +798,7 @@ export class UserService {
   }
 
   //  google login service
-  async googleLogin(token: string, guestId?: string) {
+  async googleLogin(token: string, guestId?: string, ip?: string, userAgent?: string) {
     const res = await this.verifyGoogleAccessToken(token);
     const { name, email, picture } = res;
 
@@ -807,6 +893,9 @@ export class UserService {
       },
     });
 
+    // Record login session & IP
+    const session = await this.recordLoginSession(user.id, ip, userAgent);
+
     const data = {
       name: user.name,
       email: user.email,
@@ -832,12 +921,13 @@ export class UserService {
           refreshToken,
         },
         user: data,
+        sessionId: session?.id,
       },
     };
   }
 
   // apple login service
-  async appleLogin(token: string, guestId?: string) {
+  async appleLogin(token: string, guestId?: string, ip?: string, userAgent?: string) {
     const res = await this.verifyAppleToken(token);
     const { email } = res;
 
@@ -932,6 +1022,9 @@ export class UserService {
       },
     });
 
+    // Record login session & IP
+    const session = await this.recordLoginSession(user.id, ip, userAgent);
+
     const data = {
       name: user.name,
       email: user.email,
@@ -957,11 +1050,16 @@ export class UserService {
           refreshToken,
         },
         user: data,
+        sessionId: session?.id,
       },
     };
   }
 
   async logOut(id: string) {
+    await this.prisma.userSession.updateMany({
+      where: { userId: id, isCurrent: true },
+      data: { isCurrent: false },
+    }).catch(() => {});
     await this.userRepo.logOut(id);
   }
 

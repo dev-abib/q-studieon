@@ -20,6 +20,10 @@ import {
   AdminForgotPasswordDto,
   AdminResetPasswordDto,
 } from './dto/admin-password.dto';
+import { BlockUserDto } from './dto/block-user.dto';
+import { SoftDeleteUserDto } from './dto/soft-delete-user.dto';
+import { FlagUserDto } from './dto/flag-user.dto';
+import { ResolveFlagDto } from './dto/resolve-flag.dto';
 import { inviteMemberTemplate } from '../infra/mail/templates/auth/invite-member.template';
 import { adminResetPasswordTemplate } from '../infra/mail/templates/auth/admin-reset-password.template';
 import { MulterFile } from '../common/pipes/file-validation.pipe';
@@ -79,7 +83,16 @@ export class AdminService {
   async getAllAdminsUsers(query: PaginationDto, isAdmin: boolean = true) {
     const { page, limit, skip, sortBy, sortOrder, search } = query;
 
-    const allowedSortFields = ['name', 'email', 'createdAt', 'updatedAt'];
+    const allowedSortFields = [
+      'name',
+      'email',
+      'createdAt',
+      'updatedAt',
+      'userRole',
+      'role',
+      'status',
+      'isPaid',
+    ];
     const safeSortBy = allowedSortFields.includes(sortBy)
       ? sortBy
       : 'createdAt';
@@ -104,7 +117,15 @@ export class AdminService {
       }),
     };
 
-    const [directory, total, otpVerifiedCount, guestCount] = await Promise.all([
+    const [
+      directory,
+      total,
+      otpVerifiedCount,
+      guestCount,
+      paidCount,
+      blockedCount,
+      deletedCount,
+    ] = await Promise.all([
       this.prisma.user.findMany({
         where,
         orderBy: { [safeSortBy]: sortOrder },
@@ -115,13 +136,46 @@ export class AdminService {
           name: true,
           email: true,
           role: true,
+          userRole: true,
+          isPaid: true,
+          isGuest: true,
+          isOtpVerified: true,
+          status: true,
+          billingCycle: true,
+          blockedUntil: true,
+          blockReason: true,
+          isDeleted: true,
+          deletedAt: true,
+          purgeAt: true,
+          deleteReason: true,
+          isOwner: true,
+          canDeleteQueries: true,
+          canViewUserDetails: true,
           createdAt: true,
           profilePictureURL: true,
+          lastLoginAt: true,
+          lastActiveIp: true,
+          loginCount: true,
+          totalSessionMinutes: true,
+          _count: {
+            select: {
+              reports: true,
+              collections: true,
+              payments: true,
+              contactQueries: true,
+              sessions: true,
+            },
+          },
         },
       }),
       this.prisma.user.count({ where }),
       this.prisma.user.count({ where: { ...where, isOtpVerified: true } }),
       this.prisma.user.count({ where: { ...where, isGuest: true } }),
+      this.prisma.user.count({ where: { ...where, isPaid: true } }),
+      this.prisma.user.count({
+        where: { ...where, blockedUntil: { gt: new Date() } },
+      }),
+      this.prisma.user.count({ where: { ...where, isDeleted: true } }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
@@ -134,6 +188,9 @@ export class AdminService {
           total,
           otpVerifiedCount,
           guestCount,
+          paidCount,
+          blockedCount,
+          deletedCount,
           page,
           limit,
           totalPages,
@@ -916,5 +973,279 @@ export class AdminService {
     return {
       message: 'Password reset successfully. You can now log in.',
     };
+  }
+
+  // ─── Soft Block User ────────────────────────────────────────────────────────
+  async blockUser(id: string, dto: BlockUserDto, session: JwtPayload) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    if (user.isOwner) {
+      throw new BadRequestException('The primary Site Owner cannot be blocked.');
+    }
+
+    const blockedUntil = new Date(dto.blockedUntil);
+    if (isNaN(blockedUntil.getTime())) {
+      throw new BadRequestException('Invalid date format for blockedUntil.');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        blockedUntil,
+        blockReason: dto.reason || 'Account suspended by Administrator',
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        blockedUntil: true,
+        blockReason: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: `User ${updated.name || updated.email} has been soft-blocked until ${blockedUntil.toLocaleDateString()}.`,
+      data: updated,
+    };
+  }
+
+  // ─── Unblock User ──────────────────────────────────────────────────────────
+  async unblockUser(id: string, session: JwtPayload) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        blockedUntil: null,
+        blockReason: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        blockedUntil: true,
+        blockReason: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: `User ${updated.name || updated.email} has been unblocked successfully.`,
+      data: updated,
+    };
+  }
+
+  // ─── Soft Delete User (with 60-day recovery retention) ─────────────────────
+  async softDeleteUser(id: string, dto: SoftDeleteUserDto, session: JwtPayload) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    if (user.isOwner) {
+      throw new BadRequestException('The primary Site Owner account cannot be deleted.');
+    }
+
+    // If explicit hard delete requested (Super Admin only)
+    if (dto?.immediateHardDelete) {
+      if (session.role !== 'super_admin' && !session.isOwner) {
+        throw new UnauthorizedException(
+          'Only Super Admins can permanently hard-delete user accounts immediately.',
+        );
+      }
+      return this.deleteAdminOrUser(id, false, session);
+    }
+
+    // Default: Soft Delete with 60-day preservation
+    const deletedAt = new Date();
+    const purgeAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 days
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        deletedAt,
+        purgeAt,
+        deleteReason: dto?.reason || 'Account removed by Administrator',
+        deletedBy: session.name || session.email || 'Administrator',
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isDeleted: true,
+        deletedAt: true,
+        purgeAt: true,
+        deleteReason: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: `User account soft-deleted. All data is preserved for 60 days (until ${purgeAt.toLocaleDateString()}) with recovery option.`,
+      data: updated,
+    };
+  }
+
+  // ─── Restore / Retain Account ──────────────────────────────────────────────
+  async restoreUser(id: string, session: JwtPayload) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        isDeleted: false,
+        deletedAt: null,
+        purgeAt: null,
+        deleteReason: null,
+        deletedBy: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isDeleted: true,
+        deletedAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: `User account ${updated.name || updated.email} has been successfully restored and retained.`,
+      data: updated,
+    };
+  }
+
+  // ─── Flag User to Super Admin ──────────────────────────────────────────────
+  async flagUser(id: string, dto: FlagUserDto, session: JwtPayload) {
+    const target = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!target) {
+      throw new NotFoundException('Target user not found.');
+    }
+
+    const flag = await this.prisma.userFlag.create({
+      data: {
+        userId: id,
+        flaggedById: session.id,
+        action: dto.action,
+        reason: dto.reason,
+        note: dto.note || null,
+        status: 'PENDING',
+      },
+      include: {
+        flaggedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Moderation flag has been submitted to Super Admin for review.',
+      data: flag,
+    };
+  }
+
+  // ─── Resolve Moderation Flag (Super Admin only) ────────────────────────────
+  async resolveFlag(flagId: string, dto: ResolveFlagDto, session: JwtPayload) {
+    if (session.role !== 'super_admin' && !session.isOwner) {
+      throw new UnauthorizedException(
+        'Only Super Admins can resolve moderation flags.',
+      );
+    }
+
+    const flag = await this.prisma.userFlag.findUnique({
+      where: { id: flagId },
+    });
+
+    if (!flag) {
+      throw new NotFoundException('Moderation flag not found.');
+    }
+
+    const updated = await this.prisma.userFlag.update({
+      where: { id: flagId },
+      data: {
+        status: dto.status,
+        resolvedById: session.id,
+        resolvedAt: new Date(),
+      },
+    });
+
+    // If approved, automatically execute the requested action
+    if (dto.status === 'APPROVED') {
+      if (flag.action === 'BLOCK') {
+        const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await this.prisma.user.update({
+          where: { id: flag.userId },
+          data: {
+            blockedUntil: nextWeek,
+            blockReason: `Flag approved: ${flag.reason}`,
+          },
+        });
+      } else if (flag.action === 'DELETE') {
+        const purgeAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+        await this.prisma.user.update({
+          where: { id: flag.userId },
+          data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+            purgeAt,
+            deleteReason: `Flag approved: ${flag.reason}`,
+            deletedBy: session.name || session.email || 'Super Admin',
+          },
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: `Moderation flag has been marked as ${dto.status}.`,
+      data: updated,
+    };
+  }
+
+  // ─── Auto-purge expired deleted accounts ───────────────────────────────────
+  async autoPurgeExpiredAccounts() {
+    const expiredUsers = await this.prisma.user.findMany({
+      where: {
+        isDeleted: true,
+        purgeAt: { lte: new Date() },
+      },
+      select: {
+        id: true,
+        profilePicturePublicId: true,
+      },
+    });
+
+    for (const u of expiredUsers) {
+      try {
+        if (u.profilePicturePublicId) {
+          await this.cloudinary.deleteFile(u.profilePicturePublicId);
+        }
+        await this.prisma.user.delete({ where: { id: u.id } });
+      } catch (error) {
+        console.error(`Auto-purge failed for user ${u.id}:`, error);
+      }
+    }
   }
 }

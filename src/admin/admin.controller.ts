@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -40,6 +41,10 @@ import {
   AdminForgotPasswordDto,
   AdminResetPasswordDto,
 } from './dto/admin-password.dto';
+import { BlockUserDto } from './dto/block-user.dto';
+import { SoftDeleteUserDto } from './dto/soft-delete-user.dto';
+import { FlagUserDto } from './dto/flag-user.dto';
+import { ResolveFlagDto } from './dto/resolve-flag.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -116,8 +121,8 @@ export class AdminController {
   @Auth('admin')
   @ApiOperation({ summary: 'Get a user by ID' })
   @ApiParam({ name: 'id', description: 'User ID' })
-  getUserById(@Param('id') id: string) {
-    return this.user.getMe(id);
+  getUserById(@Param('id') id: string, @CurrentUser() admin: JwtPayload) {
+    return this.user.getMe(id, admin);
   }
 
   @Delete('delete-admin/:id')
@@ -132,15 +137,100 @@ export class AdminController {
   @Delete('delete-user/:id')
   @Auth('admin')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Delete a user by ID (admin only)' })
+  @ApiOperation({ summary: 'Soft delete a user with 60-day recovery retention (or hard delete if requested by super admin)' })
   @ApiParam({ name: 'id', description: 'User ID' })
-  deleteUser(@Param('id') id: string, @CurrentUser() admin: JwtPayload) {
+  deleteUser(
+    @Param('id') id: string,
+    @Body() dto: SoftDeleteUserDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
     if (admin.role === 'customer_support') {
       throw new UnauthorizedException(
         'Customer support members cannot delete users',
       );
     }
-    return this.adminService.deleteAdminOrUser(id, false, admin);
+    return this.adminService.softDeleteUser(id, dto, admin);
+  }
+
+  @Post('soft-delete-user/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Soft delete a user with 60-day recovery retention' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  softDeleteUser(
+    @Param('id') id: string,
+    @Body() dto: SoftDeleteUserDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    if (admin.role === 'customer_support') {
+      throw new UnauthorizedException(
+        'Customer support members cannot delete users',
+      );
+    }
+    return this.adminService.softDeleteUser(id, dto, admin);
+  }
+
+  @Patch('restore-user/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Restore and retain a soft-deleted user account' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  restoreUser(
+    @Param('id') id: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.restoreUser(id, admin);
+  }
+
+  @Patch('block-user/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Soft block a user for a custom time range' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  blockUser(
+    @Param('id') id: string,
+    @Body() dto: BlockUserDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.blockUser(id, dto, admin);
+  }
+
+  @Patch('unblock-user/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Unblock a soft-blocked user immediately' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  unblockUser(
+    @Param('id') id: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.unblockUser(id, admin);
+  }
+
+  @Post('flag-user/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Flag user to Super Admin with reason and notes for block/delete review' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  flagUser(
+    @Param('id') id: string,
+    @Body() dto: FlagUserDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.flagUser(id, dto, admin);
+  }
+
+  @Patch('resolve-flag/:flagId')
+  @Auth('super_admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Resolve a moderation flag (Super Admin only)' })
+  @ApiParam({ name: 'flagId', description: 'Flag ID' })
+  resolveFlag(
+    @Param('flagId') flagId: string,
+    @Body() dto: ResolveFlagDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.resolveFlag(flagId, dto, admin);
   }
 
   // get dashboard analytics

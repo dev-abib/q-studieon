@@ -26,6 +26,7 @@ import { UpdateContactQueryPriorityDto } from './dto/update-contact-query-priori
 import { AddInternalNoteDto } from './dto/add-internal-note.dto';
 import { BulkActionContactQueriesDto } from './dto/bulk-action-contact-queries.dto';
 import { ToggleDeletePermissionDto } from './dto/toggle-delete-permission.dto';
+import { ToggleUserDetailsPermissionDto } from './dto/toggle-user-details-permission.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { Auth } from '../auth/decorators/auth.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -186,7 +187,7 @@ export class ContactQueryController {
 
   // ─── 12. Super Admin: Toggle Delete Privilege for Staff ────────────────────
   @Patch('staff/:id/delete-permission')
-  @Auth('admin')
+  @Auth('super_admin')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -201,6 +202,27 @@ export class ContactQueryController {
     return this.contactQueryService.toggleStaffDeletePermission(
       id,
       dto.canDelete,
+      admin,
+    );
+  }
+
+  // ─── 12. Super Admin: Toggle User Details Privilege for Staff ───────────────
+  @Patch('staff/:id/user-details-permission')
+  @Auth('super_admin')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Grant or revoke user details viewing privilege for a staff member (Super Admin only)',
+  })
+  @ApiParam({ name: 'id', description: 'Staff User ID' })
+  toggleStaffViewUserDetailsPermission(
+    @Param('id') id: string,
+    @Body() dto: ToggleUserDetailsPermissionDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.contactQueryService.toggleStaffViewUserDetailsPermission(
+      id,
+      dto.canViewUserDetails,
       admin,
     );
   }

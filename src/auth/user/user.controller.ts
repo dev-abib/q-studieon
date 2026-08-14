@@ -40,8 +40,12 @@ export class UserController {
   @HttpCode(200)
   @Public()
   @ApiOperation({ summary: 'User login' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.loginAccount(dto);
+  login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.loginAccount(dto, ip, userAgent);
   }
 
   // Verify account controller
@@ -49,8 +53,12 @@ export class UserController {
   @HttpCode(200)
   @Public()
   @ApiOperation({ summary: 'Verify user account with OTP' })
-  verifyAccount(@Body() dto: VerifyAccountDto) {
-    return this.authService.verifyAccount(dto);
+  verifyAccount(
+    @Body() dto: VerifyAccountDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.verifyAccount(dto, ip, userAgent);
   }
 
   // Forgot password controller
@@ -142,9 +150,14 @@ export class UserController {
       required: ['token'],
     },
   })
-  googleLogin(@Body('token') token: string, @Body('guestId') guestId?: string) {
+  googleLogin(
+    @Body('token') token: string,
+    @Body('guestId') guestId: string | undefined,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
     if (!token) throw new BadRequestException('Google token is required');
-    return this.authService.googleLogin(token, guestId);
+    return this.authService.googleLogin(token, guestId, ip, userAgent);
   }
 
   // Apple login controller
@@ -174,9 +187,14 @@ export class UserController {
       required: ['token'],
     },
   })
-  appleLogin(@Body('token') token: string, @Body('guestId') guestId?: string) {
+  appleLogin(
+    @Body('token') token: string,
+    @Body('guestId') guestId: string | undefined,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
     if (!token) throw new BadRequestException('Apple token is required');
-    return this.authService.appleLogin(token, guestId);
+    return this.authService.appleLogin(token, guestId, ip, userAgent);
   }
 
   // log out controller

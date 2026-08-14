@@ -11,4 +11,7 @@ export interface JwtPayload {
     | 'finance';
   isPaid?: boolean;
   isGuest?: boolean;
+  isOwner?: boolean;
+  canDeleteQueries?: boolean;
+  canViewUserDetails?: boolean;
 }

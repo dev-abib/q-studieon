@@ -31,18 +31,94 @@ model User {
   isResetRequest         Boolean?            @default(false)
   isOwner                Boolean             @default(false)
   canDeleteQueries       Boolean?            @default(false)
+  canViewUserDetails     Boolean?            @default(false)
+  blockReason            String?
+  isDeleted              Boolean             @default(false)
+  deletedAt              DateTime?
+  purgeAt                DateTime?
+  deleteReason           String?
+  deletedBy              String?
+  lastLoginAt            DateTime?
+  lastActiveIp           String?
+  loginCount             Int?                @default(0)
+  totalSessionMinutes    Int?                @default(0)
   collections            Collection[]
   payments               Payment[]
   reports                Report[]
   sharedReports          SharedReport[]
   subscriptionEvents     SubscriptionEvent[]
   contactQueries         ContactQuery[]
+  sessions               UserSession[]
+  flags                  UserFlag[]          @relation("FlaggedUser")
+  createdFlags           UserFlag[]          @relation("FlagCreator")
 
   @@index([createdAt])
   @@index([isGuest])
   @@index([status])
   @@index([isPaid])
+  @@index([isDeleted])
+  @@index([purgeAt])
+  @@index([lastLoginAt])
+  @@index([lastActiveIp])
   @@map("users")
+}
+
+model UserSession {
+  id              String    @id @default(cuid())
+  userId          String
+  ipAddress       String?
+  userAgent       String?
+  device          String?
+  browser         String?
+  os              String?
+  city            String?
+  country         String?
+  loginAt         DateTime  @default(now())
+  lastActiveAt    DateTime  @default(now())
+  durationSeconds Int       @default(0)
+  isCurrent       Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([loginAt])
+  @@index([ipAddress])
+  @@map("user_sessions")
+}
+
+model UserFlag {
+  id           String      @id @default(cuid())
+  userId       String
+  flaggedById  String
+  action       FlagAction  @default(BLOCK)
+  reason       String
+  note         String?
+  status       FlagStatus  @default(PENDING)
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user         User        @relation("FlaggedUser", fields: [userId], references: [id], onDelete: Cascade)
+  flaggedBy    User        @relation("FlagCreator", fields: [flaggedById], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([flaggedById])
+  @@index([status])
+  @@map("user_flags")
+}
+
+enum FlagAction {
+  BLOCK
+  DELETE
+}
+
+enum FlagStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model Invitation {
