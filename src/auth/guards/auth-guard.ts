@@ -129,7 +129,11 @@ export class AuthGuard implements CanActivate {
     ) {
       throw new UnauthorizedException('Finance access required');
     }
-    if (authType === 'super_admin' && decoded.role !== 'super_admin') {
+    if (
+      authType === 'super_admin' &&
+      decoded.role !== 'super_admin' &&
+      !decoded.isOwner
+    ) {
       throw new UnauthorizedException('Super admin access required');
     }
     if (authType === 'user' && decoded.role !== 'user') {

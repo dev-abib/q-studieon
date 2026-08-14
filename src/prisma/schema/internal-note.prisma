@@ -1,0 +1,19 @@
+model InternalStaffNote {
+  id         String   @id @default(cuid())
+  targetType String   // "User" or "ContactQuery"
+  targetId   String
+  authorId   String
+  authorName String?
+  authorRole String?
+  content    String
+  isPinned   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("internal_staff_notes")
+}

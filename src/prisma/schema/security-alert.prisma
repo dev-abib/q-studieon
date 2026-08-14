@@ -1,0 +1,20 @@
+model SecurityAlert {
+  id          String   @id @default(cuid())
+  type        String   // "IMPOSSIBLE_TRAVEL", "CONCURRENT_LOGINS", "MASS_DELETION", "UNRECOGNIZED_IP", "SUSPICIOUS_ACTIVITY"
+  severity    String   @default("HIGH") // "CRITICAL", "HIGH", "MEDIUM", "LOW"
+  staffId     String?
+  staffEmail  String?
+  title       String
+  description String
+  metadata    Json?
+  isResolved  Boolean  @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  createdAt   DateTime @default(now())
+
+  @@index([type])
+  @@index([severity])
+  @@index([isResolved])
+  @@index([createdAt])
+  @@map("security_alerts")
+}

@@ -23,6 +23,8 @@ import {
   contactQueryReplyTemplate,
 } from '../infra/mail/templates/contact-query/contact-query.templates';
 
+import { AuditService } from '../admin/audit.service';
+
 @Injectable()
 export class ContactQueryService {
   private readonly logger = new Logger(ContactQueryService.name);
@@ -30,6 +32,7 @@ export class ContactQueryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly auditService: AuditService,
   ) {}
 
   // Helper to append to activity log
@@ -408,6 +411,18 @@ export class ContactQueryService {
           },
         },
       },
+    });
+
+    await this.auditService.logAction({
+      staffId: adminPayload.id,
+      staffName: responderName,
+      staffEmail: responderEmail,
+      staffRole: adminPayload.role,
+      action: 'REPLY_INQUIRY',
+      entityType: 'ContactQuery',
+      entityId: query.id,
+      entityTitle: query.subject || 'Customer Inquiry',
+      details: `Replied to inquiry from ${query.name} (${query.email}). Message: "${dto.replyMessage.trim().slice(0, 120)}..."`,
     });
 
     return {

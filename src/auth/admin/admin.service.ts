@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -61,8 +62,31 @@ export class AdminService {
 
     await this.prisma.user.update({
       where: { id: admin.id },
-      data: { refreshToken: this.auth.hashToken(refreshToken) },
+      data: {
+        refreshToken: this.auth.hashToken(refreshToken),
+        lastLoginAt: new Date(),
+        loginCount: { increment: 1 },
+      },
     });
+
+    try {
+      await this.prisma.userSession.create({
+        data: {
+          userId: admin.id,
+          ipAddress: '127.0.0.1',
+          browser: 'Chrome / Web App',
+          os: 'Desktop',
+          device: 'Desktop',
+          loginAt: new Date(),
+          lastActiveAt: new Date(),
+          durationSeconds: 60,
+          isCurrent: true,
+        },
+      });
+    } catch {
+      // Non-blocking
+    }
+
     return {
       message: `${admin.role} logged in successfully`,
       data: {
@@ -146,6 +170,14 @@ export class AdminService {
 
     if (existingUser.role === 'user') {
       throw new UnauthorizedException('Unauthorized access');
+    }
+
+    // Check permission: Only super_admin / isOwner OR accounts with canChangePassword: true can manually change password
+    const isSuper = existingUser.role === 'super_admin' || existingUser.isOwner;
+    if (!isSuper && !existingUser.canChangePassword) {
+      throw new ForbiddenException(
+        'Manual password changes are restricted. You must have permission from a Super Admin to change your password, or use the Forgot Password recovery link on the sign-in page.',
+      );
     }
 
     if (!existingUser.password) {

@@ -1,0 +1,23 @@
+model StaffAuditLog {
+  id          String   @id @default(cuid())
+  staffId     String
+  staffName   String?
+  staffEmail  String?
+  staffRole   String?
+  action      String   // e.g. "CREATE_FAQ", "UPDATE_PAGE", "GRANT_ACCESS", "REVOKE_ACCESS", "REPLY_INQUIRY", "DELETE_INQUIRY", "FLAG_USER", "TOGGLE_PERMISSION", "UPDATE_PASSWORD", "CREATE_STAFF", "REVOKE_STAFF"
+  entityType  String   // "FAQ", "DynamicPage", "Insight", "Category", "Question", "ContactQuery", "User", "StaffPermission", "Auth"
+  entityId    String?
+  entityTitle String?
+  details     String?  // Description of changes or payload summary
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  staff       User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("staff_audit_logs")
+}

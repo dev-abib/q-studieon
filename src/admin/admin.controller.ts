@@ -45,6 +45,13 @@ import { BlockUserDto } from './dto/block-user.dto';
 import { SoftDeleteUserDto } from './dto/soft-delete-user.dto';
 import { FlagUserDto } from './dto/flag-user.dto';
 import { ResolveFlagDto } from './dto/resolve-flag.dto';
+import { GrantAccessDto, RevokeAccessDto } from './dto/grant-access.dto';
+
+import { AuditService } from './audit.service';
+import { PresenceService, PresenceHeartbeatDto } from './presence.service';
+import { SecurityAlertService } from './security-alert.service';
+import { InternalNotesService, CreateInternalNoteDto } from './internal-notes.service';
+import { SystemStatusService } from './system-status.service';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -53,7 +60,142 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly user: UserService,
+    private readonly auditService: AuditService,
+    private readonly presenceService: PresenceService,
+    private readonly securityAlertService: SecurityAlertService,
+    private readonly internalNotesService: InternalNotesService,
+    private readonly systemStatusService: SystemStatusService,
   ) {}
+
+  // ─── Real-Time Presence & Collision Prevention ────────────────────────────
+  @Post('presence/heartbeat')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Update active presence heartbeat and current location' })
+  recordPresenceHeartbeat(
+    @CurrentUser() admin: JwtPayload,
+    @Body() dto: PresenceHeartbeatDto,
+  ) {
+    return this.presenceService.recordHeartbeat(
+      admin.id,
+      admin.name,
+      admin.email,
+      admin.role,
+      undefined,
+      dto,
+    );
+  }
+
+  @Get('presence/active')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get all active online staff and collision detection' })
+  getActivePresence(
+    @CurrentUser() admin: JwtPayload,
+    @Query('targetId') targetId?: string,
+  ) {
+    return this.presenceService.getActivePresences(admin.id, targetId);
+  }
+
+  // ─── Private Internal Staff Notes ─────────────────────────────────────────
+  @Get('internal-notes/:targetType/:targetId')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get internal staff notes for a user or query' })
+  getInternalNotes(
+    @Param('targetType') targetType: string,
+    @Param('targetId') targetId: string,
+  ) {
+    return this.internalNotesService.getNotes(targetType, targetId);
+  }
+
+  @Post('internal-notes')
+  @Auth('admin')
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Add a private internal note' })
+  createInternalNote(
+    @Body() dto: CreateInternalNoteDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.internalNotesService.createNote(dto, admin);
+  }
+
+  @Patch('internal-notes/:id/pin')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Pin/unpin an internal note' })
+  togglePinInternalNote(@Param('id') id: string) {
+    return this.internalNotesService.togglePin(id);
+  }
+
+  @Delete('internal-notes/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete an internal note' })
+  deleteInternalNote(
+    @Param('id') id: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.internalNotesService.deleteNote(id, admin);
+  }
+
+  // ─── Security & Anomaly Detection ─────────────────────────────────────────
+  @Get('security-alerts')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get active security & anomaly alerts' })
+  getSecurityAlerts(@Query('isResolved') isResolved?: string) {
+    return this.securityAlertService.getAlerts(isResolved === 'true');
+  }
+
+  @Patch('security-alerts/:id/resolve')
+  @Auth('super_admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Resolve a security alert (super admin only)' })
+  resolveSecurityAlert(
+    @Param('id') id: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.securityAlertService.resolveAlert(id, admin.name || admin.email || 'Admin');
+  }
+
+  // ─── Super Admin: Impersonate User ────────────────────────────────────────
+  @Post('impersonate-user/:userId')
+  @Auth('super_admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Start safe user impersonation mode' })
+  impersonateUser(
+    @Param('userId') userId: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.impersonateUser(userId, admin);
+  }
+
+  // ─── VIP Grant Expiry Check Trigger ───────────────────────────────────────
+  @Post('trigger-grant-expiry-check')
+  @Auth('super_admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Trigger VIP grant expiry notifications and conversion' })
+  triggerGrantExpiryCheck() {
+    return this.adminService.checkExpiringGrants();
+  }
+
+  // ─── 1-Click CSV Exports ──────────────────────────────────────────────────
+  @Get('export/work-time-csv')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Export team work time spreadsheet as CSV' })
+  exportWorkTimeCsv() {
+    return this.adminService.exportWorkTimeCsv();
+  }
+
+  @Get('export/audit-logs-csv')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Export site modification audit logs as CSV' })
+  exportAuditLogsCsv() {
+    return this.adminService.exportAuditLogsCsv();
+  }
 
   // get me admin controller
   @Get('get-me-admin')
@@ -62,6 +204,47 @@ export class AdminController {
   @ApiOperation({ summary: 'Get current admin profile' })
   getMeAdmin(@CurrentUser() user: JwtPayload) {
     return this.adminService.getMeAdmin(user);
+  }
+
+  @Get('staff-profile/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get staff member profile, duties, stats, and audit trail' })
+  @ApiParam({ name: 'id', description: 'Staff user ID or "me"' })
+  getStaffProfile(
+    @Param('id') id: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.getStaffProfile(id, admin);
+  }
+
+  @Get('audit-logs')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get paginated staff audit logs and site changes' })
+  getAuditLogs(@Query() query: any) {
+    return this.auditService.getAuditLogs(query);
+  }
+
+  @Get('work-time-summary')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get team working hours and session analytics' })
+  getTeamWorkTimeSummary() {
+    return this.auditService.getTeamWorkTimeSummary();
+  }
+
+  @Get('staff-work-time/:id')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Get individual staff working hours and session breakdown' })
+  @ApiParam({ name: 'id', description: 'Staff user ID or "me"' })
+  getStaffWorkTime(
+    @Param('id') id: string,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    const targetId = !id || id === 'me' ? admin.id : id;
+    return this.auditService.getStaffWorkTimeDetails(targetId);
   }
 
   // get all admin controller
@@ -78,8 +261,8 @@ export class AdminController {
   @Auth('super_admin')
   @HttpCode(201)
   @ApiOperation({ summary: 'Create a new admin (super admin only)' })
-  createAdmin(@Body() dto: CreateAdminDto) {
-    return this.adminService.createAdmin(dto);
+  createAdmin(@Body() dto: CreateAdminDto, @CurrentUser() admin: JwtPayload) {
+    return this.adminService.createAdmin(dto, admin);
   }
 
   // update admin controller
@@ -126,7 +309,7 @@ export class AdminController {
   }
 
   @Delete('delete-admin/:id')
-  @Auth('super_admin')
+  @Auth('admin')
   @HttpCode(200)
   @ApiOperation({ summary: 'Delete an admin by ID (super admin only)' })
   @ApiParam({ name: 'id', description: 'Admin ID' })
@@ -221,7 +404,7 @@ export class AdminController {
   }
 
   @Patch('resolve-flag/:flagId')
-  @Auth('super_admin')
+  @Auth('admin')
   @HttpCode(200)
   @ApiOperation({ summary: 'Resolve a moderation flag (Super Admin only)' })
   @ApiParam({ name: 'flagId', description: 'Flag ID' })
@@ -231,6 +414,32 @@ export class AdminController {
     @CurrentUser() admin: JwtPayload,
   ) {
     return this.adminService.resolveFlag(flagId, dto, admin);
+  }
+
+  @Patch('grant-access/:userId')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Grant complimentary subscription access to a user (Admin)' })
+  @ApiParam({ name: 'userId', description: 'Target user ID' })
+  grantUserAccess(
+    @Param('userId') userId: string,
+    @Body() dto: GrantAccessDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.grantUserAccess(userId, dto, admin);
+  }
+
+  @Patch('revoke-access/:userId')
+  @Auth('admin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Revoke subscription access from a user (Admin)' })
+  @ApiParam({ name: 'userId', description: 'Target user ID' })
+  revokeUserAccess(
+    @Param('userId') userId: string,
+    @Body() dto: RevokeAccessDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.revokeUserAccess(userId, dto, admin);
   }
 
   // get dashboard analytics
@@ -291,5 +500,24 @@ export class AdminController {
   @ApiOperation({ summary: 'Reset admin password using token' })
   resetPassword(@Body() dto: AdminResetPasswordDto) {
     return this.adminService.adminResetPassword(dto);
+  }
+
+  @Patch('toggle-password-permission/:staffId')
+  @Auth('admin')
+  @ApiOperation({ summary: 'Toggle staff manual password change permission (Super Admin only)' })
+  togglePasswordPermission(
+    @Param('staffId') staffId: string,
+    @Body('canChangePassword') canChangePassword: boolean,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.togglePasswordPermission(staffId, Boolean(canChangePassword), admin);
+  }
+
+  // ─── System Health, OpenAI Tokens, and Infrastructure Status ───────────────
+  @Get('system/status')
+  @Auth('admin')
+  @ApiOperation({ summary: 'Get real-time infrastructure, OpenAI token usage, and database health metrics' })
+  getSystemStatus() {
+    return this.systemStatusService.getSystemStatus();
   }
 }

@@ -32,6 +32,7 @@ model User {
   isOwner                Boolean             @default(false)
   canDeleteQueries       Boolean?            @default(false)
   canViewUserDetails     Boolean?            @default(false)
+  canChangePassword      Boolean?            @default(false)
   blockReason            String?
   isDeleted              Boolean             @default(false)
   deletedAt              DateTime?
@@ -42,6 +43,10 @@ model User {
   lastActiveIp           String?
   loginCount             Int?                @default(0)
   totalSessionMinutes    Int?                @default(0)
+  adminGrantedAccess     Boolean?            @default(false)
+  adminGrantedReason     String?
+  adminGrantedBy         String?
+  adminGrantedAt         DateTime?
   collections            Collection[]
   payments               Payment[]
   reports                Report[]
@@ -51,6 +56,8 @@ model User {
   sessions               UserSession[]
   flags                  UserFlag[]          @relation("FlaggedUser")
   createdFlags           UserFlag[]          @relation("FlagCreator")
+  auditLogs              StaffAuditLog[]
+  internalNotes          InternalStaffNote[]
 
   @@index([createdAt])
   @@index([isGuest])

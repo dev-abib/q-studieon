@@ -14,4 +14,7 @@ export interface JwtPayload {
   isOwner?: boolean;
   canDeleteQueries?: boolean;
   canViewUserDetails?: boolean;
+  canChangePassword?: boolean;
+  isImpersonated?: boolean;
+  originalAdminId?: string;
 }

@@ -18,7 +18,12 @@ export const newContactQueryNotificationTemplate = ({
   queryId,
 }: NewContactQueryEmailProps): string => {
   const siteName = (process.env.SITE_NAME as string) ?? 'Dwellr';
-  const frontendUrl = process.env.FRONTEND_URL || 'https://admin.dwellr.tech';
+  const frontendUrl =
+    process.env.ADMIN_FRONTEND_URL ||
+    process.env.FRONTEND_URL ||
+    (process.env.NODE_ENV === 'production'
+      ? 'https://admin.dwellr.tech'
+      : 'http://localhost:3003');
   const queryUrl = `${frontendUrl}/dashboard/queries`;
 
   const content = `
