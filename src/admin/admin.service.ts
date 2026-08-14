@@ -435,7 +435,13 @@ export class AdminService {
             where: { status: 'succeeded', createdAt: { gte: startOf12MonthsAgo } },
             select: { amount: true, billingCycle: true, createdAt: true },
           })
-        : Promise.resolve([]),
+        : Promise.resolve(
+            [] as Array<{
+              amount: number | null;
+              billingCycle: string | null;
+              createdAt: Date;
+            }>,
+          ),
     ]);
 
     // ── 1. Build Reports Chart (14 days) ─────────────────────────────────────

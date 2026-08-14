@@ -1,0 +1,56 @@
+model ContactQuery {
+  id               String               @id @default(cuid())
+  name             String
+  email            String
+  subject          String
+  message          String
+  status           ContactQueryStatus   @default(PENDING)
+  priority         ContactQueryPriority @default(MEDIUM)
+  isRegisteredUser Boolean              @default(false)
+  userId           String?
+  user             User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Admin reply tracking
+  replyMessage     String?
+  repliedAt        DateTime?
+  repliedById      String?
+  repliedByName    String?
+  repliedByEmail   String?
+
+  // Case Assignment & Delegation
+  assignedToId     String?
+  assignedToName   String?
+  assignedToEmail  String?
+  assignedToRole   String?
+  assignedAt       DateTime?
+  transferNote     String?
+
+  // Internal Staff Notes & Activity
+  internalNotes    String?
+  activityLog      Json?
+
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([isRegisteredUser])
+  @@index([assignedToId])
+  @@map("contact_queries")
+}
+
+enum ContactQueryStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ContactQueryPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}

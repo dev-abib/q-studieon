@@ -40,13 +40,20 @@ export class ResponseInterceptor<T> implements NestInterceptor<
     if (skip) return next.handle();
 
     return next.handle().pipe(
-      map(
-        (data: RequestData<T>): SuccessResponse<T> => ({
+      map((res: any): SuccessResponse<T> => {
+        if (res && typeof res === 'object' && 'data' in res) {
+          return {
+            success: true,
+            message: res.message ?? 'Success',
+            data: res.data ?? null,
+          };
+        }
+        return {
           success: true,
-          message: data?.message ?? 'Success',
-          data: data?.data ?? null,
-        }),
-      ),
+          message: res?.message ?? 'Success',
+          data: res ?? null,
+        };
+      }),
     );
   }
 }

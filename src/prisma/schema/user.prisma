@@ -30,11 +30,13 @@ model User {
   guestDeviceId          String?
   isResetRequest         Boolean?            @default(false)
   isOwner                Boolean             @default(false)
+  canDeleteQueries       Boolean?            @default(false)
   collections            Collection[]
   payments               Payment[]
   reports                Report[]
   sharedReports          SharedReport[]
   subscriptionEvents     SubscriptionEvent[]
+  contactQueries         ContactQuery[]
 
   @@index([createdAt])
   @@index([isGuest])

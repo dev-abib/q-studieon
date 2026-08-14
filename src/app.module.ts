@@ -22,6 +22,7 @@ import { QuestionsModule } from './questions/questions.module';
 import { InsightModule } from './insight/insight.module';
 import { SharedReportModule } from './shared-report/shared-report.module';
 import { FaqModule } from './faq/faq.module';
+import { ContactQueryModule } from './contact-query/contact-query.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { FaqModule } from './faq/faq.module';
     SharedReportModule,
     InsightModule,
     FaqModule,
+    ContactQueryModule,
   ],
   controllers: [AppController, SubscriptionController],
   providers: [
