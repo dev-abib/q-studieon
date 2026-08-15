@@ -33,6 +33,11 @@ model User {
   canDeleteQueries       Boolean?            @default(false)
   canViewUserDetails     Boolean?            @default(false)
   canChangePassword      Boolean?            @default(false)
+  canManageFaqs          Boolean?            @default(false)
+  canManagePages         Boolean?            @default(false)
+  canManageTasks         Boolean?            @default(false)
+  canManagePayments      Boolean?            @default(false)
+  canManageReports       Boolean?            @default(false)
   blockReason            String?
   isDeleted              Boolean             @default(false)
   deletedAt              DateTime?
@@ -58,6 +63,18 @@ model User {
   createdFlags           UserFlag[]          @relation("FlagCreator")
   auditLogs              StaffAuditLog[]
   internalNotes          InternalStaffNote[]
+  // Chat relations
+  createdGroups          ChatGroup[]         @relation("GroupCreator")
+  groupMemberships       ChatGroupMember[]   @relation("GroupMember")
+  sentMessages           ChatMessage[]       @relation("MessageSender")
+  chatMentions           ChatMention[]       @relation("MentionedUser")
+  chatReads              ChatRead[]          @relation("ChatReadUser")
+  // Task relations
+  assignedTasks          TaskAssignment[]    @relation("TaskAssignee")
+  createdTasks           TaskAssignment[]    @relation("TaskCreator")
+  taskComments           TaskComment[]       @relation("TaskCommentAuthor")
+  // Web Push subscriptions
+  pushSubscriptions      PushSubscription[]   @relation("PushSubscriptions")
 
   @@index([createdAt])
   @@index([isGuest])

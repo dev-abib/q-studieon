@@ -29,6 +29,7 @@ import {
   RevokeAccessDto,
   AccessDurationPlan,
 } from './dto/grant-access.dto';
+import { UpdatePermissionsDto } from './dto/update-permissions.dto';
 import { inviteMemberTemplate } from '../infra/mail/templates/auth/invite-member.template';
 import { adminResetPasswordTemplate } from '../infra/mail/templates/auth/admin-reset-password.template';
 import { MulterFile } from '../common/pipes/file-validation.pipe';
@@ -1508,6 +1509,49 @@ export class AdminService {
     };
   }
 
+  async updatePermissions(staffId: string, dto: UpdatePermissionsDto, session: JwtPayload) {
+    if (session.role !== 'super_admin' && !session.isOwner) {
+      throw new UnauthorizedException('Only Super Admins can manage staff permissions.');
+    }
+
+    const staff = await this.prisma.user.findUnique({ where: { id: staffId } });
+    if (!staff) {
+      throw new NotFoundException('Staff member not found.');
+    }
+
+    const updatedData: any = {};
+    if (dto.canDeleteQueries !== undefined) updatedData.canDeleteQueries = dto.canDeleteQueries;
+    if (dto.canViewUserDetails !== undefined) updatedData.canViewUserDetails = dto.canViewUserDetails;
+    if (dto.canChangePassword !== undefined) updatedData.canChangePassword = dto.canChangePassword;
+    if (dto.canManageFaqs !== undefined) updatedData.canManageFaqs = dto.canManageFaqs;
+    if (dto.canManagePages !== undefined) updatedData.canManagePages = dto.canManagePages;
+    if (dto.canManageTasks !== undefined) updatedData.canManageTasks = dto.canManageTasks;
+    if (dto.canManagePayments !== undefined) updatedData.canManagePayments = dto.canManagePayments;
+    if (dto.canManageReports !== undefined) updatedData.canManageReports = dto.canManageReports;
+
+    const updated = await this.prisma.user.update({
+      where: { id: staffId },
+      data: updatedData,
+    });
+
+    await this.auditService.logAction({
+      staffId: session.id,
+      staffName: session.name || session.email,
+      staffEmail: session.email,
+      staffRole: session.role,
+      action: 'UPDATE_STAFF_PERMISSIONS',
+      entityType: 'StaffPermission',
+      entityId: staff.id,
+      entityTitle: staff.name || staff.email || 'Staff',
+      details: `Updated permissions matrix for ${staff.name || staff.email} (${staff.role}).`,
+    });
+
+    return {
+      message: 'Staff permissions updated successfully.',
+      data: updated,
+    };
+  }
+
   // ─── Get Staff Profile & Duties ───────────────────────────────────────────
   async getStaffProfile(targetId: string, session: JwtPayload) {
     const isMe = !targetId || targetId === 'me' || targetId === session.id;
@@ -1882,6 +1926,11 @@ export class AdminService {
           canViewUserDetails: Boolean(user.isOwner || user.role === 'super_admin' || user.canViewUserDetails),
           canDeleteQueries: Boolean(user.isOwner || user.role === 'super_admin' || user.canDeleteQueries),
           canChangePassword: Boolean(user.isOwner || user.role === 'super_admin' || user.canChangePassword),
+          canManageFaqs: Boolean(user.isOwner || user.role === 'super_admin' || user.canManageFaqs),
+          canManagePages: Boolean(user.isOwner || user.role === 'super_admin' || user.canManagePages),
+          canManageTasks: Boolean(user.isOwner || user.role === 'super_admin' || user.canManageTasks),
+          canManagePayments: Boolean(user.isOwner || user.role === 'super_admin' || user.canManagePayments),
+          canManageReports: Boolean(user.isOwner || user.role === 'super_admin' || user.canManageReports),
           isSuperAdmin: Boolean(user.isOwner || user.role === 'super_admin'),
         },
         stats: {

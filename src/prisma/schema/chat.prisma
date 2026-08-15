@@ -1,0 +1,114 @@
+// ─────────────────────────────────────────────────────────
+// Team Chat Models
+// ─────────────────────────────────────────────────────────
+
+model ChatGroup {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  avatarColor String?   @default("#6366f1") // tailwind indigo-500 hex
+  isArchived  Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  createdBy   User            @relation("GroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members     ChatGroupMember[]
+  messages    ChatMessage[]
+
+  @@index([createdById])
+  @@index([isArchived])
+  @@map("chat_groups")
+}
+
+model ChatGroupMember {
+  id        String    @id @default(cuid())
+  groupId   String
+  staffId   String
+  addedAt   DateTime  @default(now())
+
+  group     ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  staff     User      @relation("GroupMember", fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, staffId])
+  @@index([groupId])
+  @@index([staffId])
+  @@map("chat_group_members")
+}
+
+model ChatMessage {
+  id             String    @id @default(cuid())
+  senderId       String
+  // For group messages
+  groupId        String?
+  // For DMs: the target staff id (the smaller id is stored in dmPartnerId for consistency)
+  dmPartnerId    String?
+  content        String
+  isEdited       Boolean   @default(false)
+  editedAt       DateTime?
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  // Moderation
+  isFlagged      Boolean   @default(false)
+  flagReason     String?
+  flaggedById    String?
+  flaggedAt      DateTime?
+  // Suspicious auto-scan
+  isAutoFlagged  Boolean   @default(false)
+  autoFlagReason String?
+  // File attachment
+  attachmentUrl       String?
+  attachmentType      String?  // "image" | "video" | "document" | "audio"
+  attachmentName      String?
+  attachmentSizeBytes Int?
+  attachmentPublicId  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sender    User              @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  group     ChatGroup?        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mentions  ChatMention[]
+  reads     ChatRead[]
+
+  @@index([senderId])
+  @@index([groupId])
+  @@index([dmPartnerId])
+  @@index([createdAt])
+  @@index([isFlagged])
+  @@index([isAutoFlagged])
+  @@map("chat_messages")
+}
+
+model ChatMention {
+  id         String      @id @default(cuid())
+  messageId  String
+  mentionedId String
+  isRead     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  message    ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mentioned  User        @relation("MentionedUser", fields: [mentionedId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([mentionedId])
+  @@index([isRead])
+  @@map("chat_mentions")
+}
+
+model ChatRead {
+  id           String      @id @default(cuid())
+  staffId      String
+  // Either groupId or dmPartnerId must be set
+  groupId      String?
+  dmPartnerId  String?
+  lastMessageId String?
+  readAt       DateTime    @default(now())
+
+  staff        User        @relation("ChatReadUser", fields: [staffId], references: [id], onDelete: Cascade)
+  lastMessage  ChatMessage? @relation(fields: [lastMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([staffId, groupId])
+  @@unique([staffId, dmPartnerId])
+  @@index([staffId])
+  @@map("chat_reads")
+}

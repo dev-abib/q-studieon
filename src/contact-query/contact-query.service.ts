@@ -24,6 +24,7 @@ import {
 } from '../infra/mail/templates/contact-query/contact-query.templates';
 
 import { AuditService } from '../admin/audit.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class ContactQueryService {
@@ -33,6 +34,7 @@ export class ContactQueryService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly auditService: AuditService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   // Helper to append to activity log
@@ -108,6 +110,13 @@ export class ContactQueryService {
       );
       // Do not throw error so user's query remains successfully saved
     }
+
+    // Emit notification to all active admins on WebSocket
+    this.chatGateway.sendNotificationToAdmins(
+      'New Website Inquiry 📨',
+      `Subject: ${dto.subject.trim()} from ${dto.name.trim()}`,
+      { queryId: query.id }
+    );
 
     return {
       success: true,

@@ -23,6 +23,10 @@ import { InsightModule } from './insight/insight.module';
 import { SharedReportModule } from './shared-report/shared-report.module';
 import { FaqModule } from './faq/faq.module';
 import { ContactQueryModule } from './contact-query/contact-query.module';
+import { ChatModule } from './chat/chat.module';
+import { TaskManagerModule } from './task-manager/task-manager.module';
+import { PushModule } from './push/push.module';
+
 
 @Module({
   imports: [
@@ -44,6 +48,9 @@ import { ContactQueryModule } from './contact-query/contact-query.module';
     InsightModule,
     FaqModule,
     ContactQueryModule,
+    ChatModule,
+    TaskManagerModule,
+    PushModule,
   ],
   controllers: [AppController, SubscriptionController],
   providers: [

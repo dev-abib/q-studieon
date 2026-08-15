@@ -27,6 +27,7 @@ import { AdminService } from './admin.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
+import { UpdatePermissionsDto } from './dto/update-permissions.dto';
 import { createFileUploadInterceptor } from '../common/interceptors/file-upload.interceptor';
 import {
   FileValidationPipe,
@@ -511,6 +512,17 @@ export class AdminController {
     @CurrentUser() admin: JwtPayload,
   ) {
     return this.adminService.togglePasswordPermission(staffId, Boolean(canChangePassword), admin);
+  }
+
+  @Patch('update-permissions/:staffId')
+  @Auth('admin')
+  @ApiOperation({ summary: 'Update admin specific permissions (Super Admin only)' })
+  updatePermissions(
+    @Param('staffId') staffId: string,
+    @Body() dto: UpdatePermissionsDto,
+    @CurrentUser() admin: JwtPayload,
+  ) {
+    return this.adminService.updatePermissions(staffId, dto, admin);
   }
 
   // ─── System Health, OpenAI Tokens, and Infrastructure Status ───────────────
