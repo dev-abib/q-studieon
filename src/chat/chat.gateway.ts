@@ -126,29 +126,38 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   sendNotificationToUser(userId: string, title: string, body: string, data?: any) {
+    const payload = {
+      title,
+      body,
+      type: data?.type || 'inquiry',
+      url: data?.url || '/dashboard/queries',
+      data: { ...data, targetUserId: userId },
+    };
+
     if (this.server) {
-      this.server.to(`user:${userId}`).emit('systemNotification', {
-        title,
-        body,
-        data,
-      });
+      this.server.to(`user:${userId}`).emit('systemNotification', payload);
+      this.server.emit('systemNotification', payload);
     }
-    // OS-level push even when the recipient is not in the browser / tab is backgrounded
+    // OS-level push even when recipient is not in browser
     void this.pushService.sendToUser(userId, {
       title,
       body,
-      url: data?.url || '/dashboard/team-chat',
+      url: data?.url || '/dashboard/queries',
       data,
     });
   }
 
   sendNotificationToAdmins(title: string, body: string, data?: any) {
+    const payload = {
+      title,
+      body,
+      type: data?.type || 'inquiry',
+      url: data?.url || '/dashboard/queries',
+      data,
+    };
+
     if (this.server) {
-      this.server.emit('systemNotification', {
-        title,
-        body,
-        data,
-      });
+      this.server.emit('systemNotification', payload);
     }
     // OS-level push to all staff, regardless of whether their tab is open
     void this.pushService.sendToRole(
@@ -156,7 +165,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       {
         title,
         body,
-        url: data?.url || '/dashboard',
+        url: data?.url || '/dashboard/queries',
         data,
       },
     );
@@ -271,8 +280,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     // Notify mentioned users (socket + OS push)
-    if (mentionedIds?.length) {
-      for (const mentionedId of mentionedIds) {
+    let finalMentionedIds = mentionedIds ? [...mentionedIds] : [];
+    const mentionsEveryone = /(^|\s)@(everyone|all|channel)(?=\s|$|[.,!?;:])/i.test(content ?? '');
+    if (groupId && mentionsEveryone) {
+      try {
+        const memberIds = await this.chatService.getGroupMemberIds(groupId);
+        finalMentionedIds = [...new Set([...finalMentionedIds, ...memberIds])];
+      } catch (err) {
+        this.logger.warn(`Failed to fetch group member IDs for @everyone: ${err}`);
+      }
+    }
+
+    if (finalMentionedIds.length > 0) {
+      const uniqueMentioned = [...new Set(finalMentionedIds)].filter((id) => id !== user.id);
+      for (const mentionedId of uniqueMentioned) {
         this.server.to(`user:${mentionedId}`).emit('mentionNotification', {
           messageId: message.id,
           senderName: user.name,
@@ -281,19 +302,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           contentSnippet: (content ?? '').slice(0, 80),
         });
 
-        if (mentionedId !== user.id) {
-          void this.pushService.sendToUser(mentionedId, {
-            title: `🔔 ${user.name || 'Someone'} mentioned you`,
-            body: `"${(content ?? '').slice(0, 80)}"`,
-            url: '/dashboard/team-chat',
-            tag: `mention-${message.id}`,
-            data: { messageId: message.id, groupId, senderId: user.id },
-          });
-        }
+        void this.pushService.sendToUser(mentionedId, {
+          title: `🔔 ${user.name || 'Someone'} mentioned you`,
+          body: `"${(content ?? '').slice(0, 80)}"`,
+          url: '/dashboard/team-chat',
+          tag: `mention-${message.id}`,
+          data: { messageId: message.id, groupId, senderId: user.id },
+        });
       }
     }
 
-    // Alert super_admin room if auto-flagged (+ OS push to super admins)
+    // Alert super_admin room if auto-flagged (+ OS push & system notification to admins)
     if (scanResult.flagged) {
       this.server.to('super_admin_room').emit('suspiciousMessage', {
         messageId: message.id,
@@ -302,6 +321,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         reason: scanResult.reason,
         roomLabel,
       });
+
+      this.sendNotificationToAdmins(
+        '⚠️ SUSPICIOUS ACTIVITY DETECTED',
+        `${user.email} flagged in ${roomLabel} for "${scanResult.reason}"`,
+        { messageId: message.id, senderId: user.id, type: 'alert', url: '/dashboard/team-chat' }
+      );
 
       void this.pushService.sendToRole(['super_admin'], {
         title: '⚠️ SUSPICIOUS ACTIVITY DETECTED',

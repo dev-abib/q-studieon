@@ -61,6 +61,8 @@ function extractOnsiteMeta(metadata: unknown): {
   };
 }
 
+import { ChatGateway } from '../chat/chat.gateway';
+
 @Injectable()
 export class OnsiteReportService {
   constructor(
@@ -69,6 +71,7 @@ export class OnsiteReportService {
     private readonly placeDetailsHelper: PlaceDetailsHelper,
     private readonly onsiteAiHelper: OnsiteAiHelper,
     private readonly cloudinary: CloudinaryService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -288,6 +291,12 @@ export class OnsiteReportService {
         metadata: toJson(metadata),
       },
     });
+
+    this.chatGateway.sendNotificationToAdmins(
+      'New Onsite Audit Report 📄',
+      `Onsite audit submitted for ${dto.address || 'Property'} by ${user.email}`,
+      { reportId: saved.id, url: '/dashboard/reports' }
+    );
 
     // ── Build response based on access level ─────────────────────────────────
 

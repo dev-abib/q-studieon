@@ -115,7 +115,7 @@ export class ContactQueryService {
     this.chatGateway.sendNotificationToAdmins(
       'New Website Inquiry 📨',
       `Subject: ${dto.subject.trim()} from ${dto.name.trim()}`,
-      { queryId: query.id }
+      { queryId: query.id, url: '/dashboard/queries' }
     );
 
     return {
@@ -434,6 +434,12 @@ export class ContactQueryService {
       details: `Replied to inquiry from ${query.name} (${query.email}). Message: "${dto.replyMessage.trim().slice(0, 120)}..."`,
     });
 
+    this.chatGateway.sendNotificationToAdmins(
+      'Inquiry Replied & Resolved 📨',
+      `Inquiry "${query.subject}" from ${query.name} replied by ${responderName}.`,
+      { queryId: query.id, url: '/dashboard/queries' }
+    );
+
     return {
       success: true,
       message: `Reply email successfully sent to ${query.email}`,
@@ -492,6 +498,20 @@ export class ContactQueryService {
       },
     });
 
+    const assignerName = currentAdmin.name || currentAdmin.email || 'An admin';
+    this.chatGateway.sendNotificationToUser(
+      targetStaff.id,
+      'Inquiry Assigned 📨',
+      `Inquiry "${existing.subject}" assigned to you by ${assignerName}.`,
+      { queryId: existing.id, url: '/dashboard/queries' }
+    );
+
+    this.chatGateway.sendNotificationToAdmins(
+      'Inquiry Transferred 📨',
+      `Inquiry "${existing.subject}" assigned to ${targetStaff.name || targetStaff.email} by ${assignerName}.`,
+      { queryId: existing.id, url: '/dashboard/queries' }
+    );
+
     return {
       success: true,
       message: `Inquiry successfully assigned to ${targetStaff.name || targetStaff.email}.`,
@@ -527,6 +547,12 @@ export class ContactQueryService {
         activityLog: updatedLog,
       },
     });
+
+    this.chatGateway.sendNotificationToAdmins(
+      'Inquiry Priority Changed ⚠️',
+      `Inquiry "${existing.subject}" priority set to ${priority} by ${currentAdmin.name || 'Admin'}.`,
+      { queryId: existing.id, url: '/dashboard/queries' }
+    );
 
     return {
       success: true,
@@ -567,6 +593,21 @@ export class ContactQueryService {
         activityLog: updatedLog,
       },
     });
+
+    if (existing.assignedToId && existing.assignedToId !== currentAdmin.id) {
+      this.chatGateway.sendNotificationToUser(
+        existing.assignedToId,
+        'New Case Discussion Note 📝',
+        `${currentAdmin.name || 'Admin'} added a note on "${existing.subject}": "${note.trim().slice(0, 60)}"`,
+        { queryId: existing.id, url: '/dashboard/queries' }
+      );
+    }
+
+    this.chatGateway.sendNotificationToAdmins(
+      'New Case Discussion Note 📝',
+      `${currentAdmin.name || 'Admin'} added a note on "${existing.subject}": "${note.trim().slice(0, 60)}"`,
+      { queryId: existing.id, url: '/dashboard/queries' }
+    );
 
     return {
       success: true,
@@ -798,7 +839,11 @@ export class ContactQueryService {
   }
 
   // ─── 12. Admin: Update Status ──────────────────────────────────────────────
-  async updateStatus(id: string, status: ContactQueryStatus) {
+  async updateStatus(
+    id: string,
+    status: ContactQueryStatus,
+    currentAdmin?: JwtPayload,
+  ) {
     const existing = await this.prisma.contactQuery.findUnique({
       where: { id },
     });
@@ -807,10 +852,29 @@ export class ContactQueryService {
       throw new NotFoundException(`Inquiry with ID "${id}" was not found.`);
     }
 
-    return this.prisma.contactQuery.update({
+    const updated = await this.prisma.contactQuery.update({
       where: { id },
       data: { status },
     });
+
+    const updaterName = currentAdmin?.name || currentAdmin?.email || 'A team member';
+
+    if (existing.assignedToId && existing.assignedToId !== currentAdmin?.id) {
+      this.chatGateway.sendNotificationToUser(
+        existing.assignedToId,
+        'Inquiry Status Updated 📨',
+        `Inquiry "${existing.subject}" status changed from ${existing.status} to ${status} by ${updaterName}.`,
+        { queryId: existing.id, url: '/dashboard/queries' }
+      );
+    }
+
+    this.chatGateway.sendNotificationToAdmins(
+      'Inquiry Status Changed 📨',
+      `Inquiry "${existing.subject}" status updated to "${status}" by ${updaterName}.`,
+      { queryId: existing.id, url: '/dashboard/queries' }
+    );
+
+    return updated;
   }
 
   // ─── 13. Admin: Delete Query ───────────────────────────────────────────────

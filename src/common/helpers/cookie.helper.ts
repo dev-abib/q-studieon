@@ -9,7 +9,6 @@ const MS_MULTIPLIERS: Record<string, number> = {
   w: 7 * 24 * 60 * 60 * 1000,
 };
 
-// parse an "ms"-style duration ("15m", "8h", "7d") into milliseconds
 function durationToMs(value: string | undefined, fallbackMs: number): number {
   if (!value) return fallbackMs;
   const match = /^(\d+)\s*(ms|s|m|h|d|w)$/i.exec(value.trim());
@@ -29,10 +28,8 @@ export class CookieHelper {
 
     const isProd = process.env.NODE_ENV === 'production' && !isLocal;
 
-    // For local development we need SameSite=lax and secure=false.
-    // Modern browsers reject SameSite=None when secure is false.
     const sameSite: 'none' | 'lax' = isProd ? 'none' : 'lax';
-    const secure = isProd; // secure only in production
+    const secure = isProd; 
 
     return {
       httpOnly: true,

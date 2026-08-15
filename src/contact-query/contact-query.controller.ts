@@ -181,8 +181,9 @@ export class ContactQueryController {
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateContactQueryStatusDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.contactQueryService.updateStatus(id, dto.status);
+    return this.contactQueryService.updateStatus(id, dto.status, user);
   }
 
   // ─── 12. Super Admin: Toggle Delete Privilege for Staff ────────────────────

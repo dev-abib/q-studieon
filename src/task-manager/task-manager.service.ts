@@ -43,12 +43,23 @@ export class TaskManagerService {
     });
 
     const creatorName = task.creator?.name || task.creator?.email || 'An admin';
+    const assigneeName = task.assignee?.name || task.assignee?.email || 'a team member';
+
     this.chatGateway.sendNotificationToUser(
       dto.assigneeId,
       'New Task Assigned 📋',
       `"${dto.title}" has been assigned to you by ${creatorName}.`,
-      { taskId: task.id }
+      { taskId: task.id, url: '/dashboard/tasks' }
     );
+
+    if (creatorId !== dto.assigneeId) {
+      this.chatGateway.sendNotificationToUser(
+        creatorId,
+        'New Task Created 📋',
+        `"${dto.title}" assigned to ${assigneeName}.`,
+        { taskId: task.id, url: '/dashboard/tasks' }
+      );
+    }
 
     return task;
   }
@@ -178,25 +189,27 @@ export class TaskManagerService {
       },
     });
 
-    // Notify assignee if task was reassigned
+    // Notify assignee & admins if task was reassigned
     if (dto.assigneeId !== undefined && updated.assigneeId) {
       this.chatGateway.sendNotificationToUser(
         updated.assigneeId,
         'Task Reassigned 📋',
         `"${updated.title}" has been assigned to you.`,
-        { taskId: updated.id }
+        { taskId: updated.id, url: '/dashboard/tasks' }
+      );
+      this.chatGateway.sendNotificationToAdmins(
+        'Task Reassigned 📋',
+        `"${updated.title}" reassigned to ${updated.assignee?.name || 'a team member'}.`,
+        { taskId: updated.id, url: '/dashboard/tasks' }
       );
     } else if (dto.status !== undefined || dto.progress !== undefined) {
-      // Notify creator of status/progress update
-      if (updated.creatorId && updated.creatorId !== updated.assigneeId) {
-        const assigneeName = updated.assignee?.name || updated.assignee?.email || 'A teammate';
-        this.chatGateway.sendNotificationToUser(
-          updated.creatorId,
-          'Task Progress Updated 📈',
-          `"${updated.title}" is now "${updated.status}" (${updated.progress}%) - updated by ${assigneeName}.`,
-          { taskId: updated.id }
-        );
-      }
+      // Notify creator & admins of status/progress update
+      const assigneeName = updated.assignee?.name || updated.assignee?.email || 'A teammate';
+      this.chatGateway.sendNotificationToAdmins(
+        'Task Progress Updated 📈',
+        `"${updated.title}" is now "${updated.status}" (${updated.progress}%) - updated by ${assigneeName}.`,
+        { taskId: updated.id, url: '/dashboard/tasks' }
+      );
     }
 
     return updated;
@@ -211,7 +224,7 @@ export class TaskManagerService {
   async addComment(taskId: string, authorId: string, dto: CreateCommentDto) {
     await this.findOne(taskId);
 
-    return this.prisma.taskComment.create({
+    const comment = await this.prisma.taskComment.create({
       data: {
         taskId,
         authorId,
@@ -221,7 +234,41 @@ export class TaskManagerService {
         author: {
           select: { id: true, name: true, email: true, profilePictureURL: true },
         },
+        task: {
+          select: { id: true, title: true, assigneeId: true, creatorId: true },
+        },
       },
     });
+
+    const authorName = comment.author?.name || comment.author?.email || 'A team member';
+    const targets = new Set<string>();
+
+    if (comment.task?.assigneeId && comment.task.assigneeId !== authorId) {
+      targets.add(comment.task.assigneeId);
+    }
+    if (comment.task?.creatorId && comment.task.creatorId !== authorId) {
+      targets.add(comment.task.creatorId);
+    }
+
+    const previousComments = await this.prisma.taskComment.findMany({
+      where: { taskId },
+      select: { authorId: true },
+    });
+    for (const pc of previousComments) {
+      if (pc.authorId && pc.authorId !== authorId) {
+        targets.add(pc.authorId);
+      }
+    }
+
+    for (const targetId of targets) {
+      this.chatGateway.sendNotificationToUser(
+        targetId,
+        'New Task Discussion Comment 💬',
+        `${authorName} commented on "${comment.task.title}": "${dto.content.slice(0, 60)}"`,
+        { taskId, url: '/dashboard/tasks' }
+      );
+    }
+
+    return comment;
   }
 }

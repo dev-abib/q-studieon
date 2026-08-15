@@ -71,9 +71,17 @@ export class ChatService {
     return groups.map((g) => g.id);
   }
 
+  async getGroupMemberIds(groupId: string): Promise<string[]> {
+    const members = await this.prisma.chatGroupMember.findMany({
+      where: { groupId },
+      select: { staffId: true },
+    });
+    return members.map((m) => m.staffId);
+  }
+
   async createGroup(
     createdById: string,
-    dto: { name: string; description?: string; avatarColor?: string; memberIds: string[] },
+    dto: { name: string; description?: string; avatarColor?: string; avatarUrl?: string; memberIds: string[] },
   ) {
     const allMemberIds = [...new Set([createdById, ...dto.memberIds])];
     return this.prisma.chatGroup.create({
@@ -81,6 +89,7 @@ export class ChatService {
         name: dto.name,
         description: dto.description,
         avatarColor: dto.avatarColor,
+        avatarUrl: dto.avatarUrl,
         createdById,
         members: {
           create: allMemberIds.map((id) => ({ staffId: id })),
@@ -99,12 +108,20 @@ export class ChatService {
   async updateGroup(
     groupId: string,
     requesterId: string,
-    dto: { name?: string; description?: string; avatarColor?: string; memberIds?: string[] },
+    dto: { name?: string; description?: string; avatarColor?: string; avatarUrl?: string; memberIds?: string[] },
   ) {
-    const group = await this.prisma.chatGroup.findUnique({ where: { id: groupId } });
+    const group = await this.prisma.chatGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
     if (!group) throw new NotFoundException('Group not found');
-    if (group.createdById !== requesterId) {
-      throw new ForbiddenException('Only the group creator can edit it');
+
+    const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });
+    const isSuperAdmin = requester?.role === 'super_admin';
+    const isMember = group.members.some((m) => m.staffId === requesterId);
+
+    if (group.createdById !== requesterId && !isSuperAdmin && !isMember) {
+      throw new ForbiddenException('Only group members or super admins can edit this group');
     }
 
     return this.prisma.chatGroup.update({
@@ -113,10 +130,11 @@ export class ChatService {
         ...(dto.name && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.avatarColor && { avatarColor: dto.avatarColor }),
+        ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
         ...(dto.memberIds && {
           members: {
             deleteMany: {},
-            create: [...new Set([requesterId, ...dto.memberIds])].map((id) => ({
+            create: [...new Set([group.createdById, requesterId, ...dto.memberIds])].map((id) => ({
               staffId: id,
             })),
           },
@@ -129,13 +147,34 @@ export class ChatService {
   async archiveGroup(groupId: string, requesterId: string) {
     const group = await this.prisma.chatGroup.findUnique({ where: { id: groupId } });
     if (!group) throw new NotFoundException('Group not found');
-    if (group.createdById !== requesterId) {
-      throw new ForbiddenException('Only the group creator can archive it');
+
+    const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });
+    const isSuperAdmin = requester?.role === 'super_admin';
+
+    if (group.createdById !== requesterId && !isSuperAdmin) {
+      throw new ForbiddenException('Only the group creator or a super admin can archive it');
     }
     return this.prisma.chatGroup.update({
       where: { id: groupId },
       data: { isArchived: true },
     });
+  }
+
+  async leaveGroup(groupId: string, staffId: string) {
+    const group = await this.prisma.chatGroup.findUnique({ where: { id: groupId } });
+    if (!group) throw new NotFoundException('Group not found');
+    if (group.createdById === staffId) {
+      throw new ForbiddenException('Group creator cannot leave the group. Archive or transfer ownership instead.');
+    }
+    const member = await this.prisma.chatGroupMember.findUnique({
+      where: { groupId_staffId: { groupId, staffId } },
+    });
+    if (!member) throw new NotFoundException('Not a member of this group');
+
+    await this.prisma.chatGroupMember.delete({
+      where: { id: member.id },
+    });
+    return { success: true };
   }
 
   // ─── Messages ──────────────────────────────────────────────────────────────

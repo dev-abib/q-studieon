@@ -62,6 +62,7 @@ export class ChatController {
       name: string;
       description?: string;
       avatarColor?: string;
+      avatarUrl?: string;
       memberIds: string[];
     },
   ) {
@@ -69,8 +70,7 @@ export class ChatController {
   }
 
   @Patch('groups/:id')
-  @Roles('super_admin')
-  @ApiOperation({ summary: 'Update a group (super_admin only)' })
+  @ApiOperation({ summary: 'Update a group' })
   updateGroup(
     @Request() req: RequestWithUser,
     @Param('id') id: string,
@@ -79,10 +79,17 @@ export class ChatController {
       name?: string;
       description?: string;
       avatarColor?: string;
+      avatarUrl?: string;
       memberIds?: string[];
     },
   ) {
     return this.chatService.updateGroup(id, req.user.id, body);
+  }
+
+  @Post('groups/:id/leave')
+  @ApiOperation({ summary: 'Leave a group' })
+  leaveGroup(@Request() req: RequestWithUser, @Param('id') id: string) {
+    return this.chatService.leaveGroup(id, req.user.id);
   }
 
   @Delete('groups/:id')
