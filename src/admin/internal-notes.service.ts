@@ -1,11 +1,22 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/types/jwt.types';
 
 export class CreateInternalNoteDto {
+  // NOTE: class-validator rejects DTOs with zero validation metadata
+  // (forbidUnknownValues defaults to true), so every field must be decorated.
+  @IsIn(['User', 'ContactQuery'])
   targetType: 'User' | 'ContactQuery';
+
+  @IsString()
   targetId: string;
+
+  @IsString()
   content: string;
+
+  @IsOptional()
+  @IsBoolean()
   isPinned?: boolean;
 }
 

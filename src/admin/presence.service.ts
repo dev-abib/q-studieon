@@ -1,10 +1,24 @@
 import { Injectable } from '@nestjs/common';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 
 export class PresenceHeartbeatDto {
+  // NOTE: class-validator rejects DTOs with zero validation metadata
+  // (forbidUnknownValues defaults to true), so every field must be decorated.
+  @IsOptional()
+  @IsString()
   currentPath?: string;
+
+  @IsOptional()
+  @IsString()
   targetId?: string;
+
+  @IsOptional()
+  @IsString()
   targetType?: string; // "User", "ContactQuery"
+
+  @IsOptional()
+  @IsBoolean()
   isTyping?: boolean;
 }
 
