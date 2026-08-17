@@ -44,7 +44,7 @@ async function bootstrap() {
     exposedHeaders: ['Set-Cookie'],
   });
 
-  app.set('trust proxy', 1);
+  app.set('trust proxy', true);
 
   app.setGlobalPrefix('api/v1', { exclude: ['api/docs', 'api/docs/(.*)'] });
 

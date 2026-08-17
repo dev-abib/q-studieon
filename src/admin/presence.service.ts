@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseUserAgent } from '../common/helpers/user-agent.helper';
 
 export class PresenceHeartbeatDto {
   // NOTE: class-validator rejects DTOs with zero validation metadata
@@ -49,6 +50,8 @@ export class PresenceService {
     staffRole: string | undefined,
     profilePictureURL: string | null | undefined,
     dto: PresenceHeartbeatDto,
+    clientIp?: string,
+    userAgent?: string,
   ) {
     const presence: ActiveStaffPresence = {
       staffId,
@@ -71,6 +74,10 @@ export class PresenceService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      const rawIp = clientIp || '127.0.0.1';
+      const cleanIp = rawIp.replace('::ffff:', '').trim();
+      const { browser, os, device } = parseUserAgent(userAgent);
+
       const latestSession = await this.prisma.userSession.findFirst({
         where: {
           userId: staffId,
@@ -80,22 +87,29 @@ export class PresenceService {
       });
 
       if (latestSession) {
+        const shouldUpdateIp =
+          cleanIp &&
+          cleanIp !== '127.0.0.1' &&
+          (latestSession.ipAddress === '127.0.0.1' || !latestSession.ipAddress);
+
         await this.prisma.userSession.update({
           where: { id: latestSession.id },
           data: {
             durationSeconds: { increment: 25 },
             lastActiveAt: new Date(),
             isCurrent: true,
+            ...(shouldUpdateIp ? { ipAddress: cleanIp } : {}),
           },
         });
       } else {
         await this.prisma.userSession.create({
           data: {
             userId: staffId,
-            ipAddress: '127.0.0.1',
-            browser: 'Chrome / Web App',
-            os: 'Desktop',
-            device: 'Desktop',
+            ipAddress: cleanIp,
+            userAgent: userAgent || null,
+            browser,
+            os,
+            device,
             loginAt: new Date(),
             lastActiveAt: new Date(),
             durationSeconds: 25,
@@ -109,6 +123,7 @@ export class PresenceService {
         data: {
           totalSessionMinutes: { increment: 1 },
           lastLoginAt: new Date(),
+          ...(cleanIp && cleanIp !== '127.0.0.1' ? { lastActiveIp: cleanIp } : {}),
         },
       });
     } catch {

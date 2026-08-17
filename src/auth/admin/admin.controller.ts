@@ -13,6 +13,7 @@ import { AdminService } from './admin.service';
 import { Public } from '../decorators/public.decorator';
 import { AdminLoginDto } from '../dto/admin-login.dto';
 import { CookieHelper } from '../../common/helpers/cookie.helper';
+import { getClientIp } from '../../common/helpers/ip.helper';
 import type { Request, Response } from 'express';
 import { Auth } from '../decorators/auth.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
@@ -30,9 +31,12 @@ export class AdminController {
   @ApiOperation({ summary: 'Admin login' })
   async loginAdmin(
     @Body() dto: AdminLoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.adminService.loginAdmin(dto);
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers['user-agent'] as string | undefined;
+    const result = await this.adminService.loginAdmin(dto, clientIp, userAgent);
 
     CookieHelper.setAdminAuthCookies(
       res,

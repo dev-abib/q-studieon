@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -10,6 +11,7 @@ import { AuthHelper } from '../helpers/auth.helper';
 import { UserRepository } from '../../common/repositories/user.repository';
 import { JwtPayload } from '../types/jwt.types';
 import { ChangePasswordDto } from '../dto/change-password.dto';
+import { parseUserAgent } from '../../common/helpers/user-agent.helper';
 
 @Injectable()
 export class AdminService {
@@ -19,34 +21,33 @@ export class AdminService {
     private readonly userRepo: UserRepository,
   ) {}
 
-  // login service
-  async loginAdmin(dto: AdminLoginDto) {
+  // login admin service
+  async loginAdmin(dto: AdminLoginDto, clientIp?: string, userAgent?: string) {
     const admin = await this.userRepo.findUser('email', dto.email);
-
-    if (admin?.role !== 'admin' && admin?.role !== 'super_admin') {
-      throw new UnauthorizedException(
-        'Only admin and super admin can login here',
-      );
+    if (!admin) {
+      throw new NotFoundException('Admin user does not exist');
     }
 
-    const isValidPass = await this.auth.comparePassword(
+    if (admin.role !== 'admin' && admin.role !== 'super_admin') {
+      throw new UnauthorizedException('Unauthorized access');
+    }
+
+    const isMatch = await this.auth.comparePassword(
       dto.password,
-      admin?.password as string,
+      admin.password as string,
     );
-
-    if (!isValidPass) {
-      throw new UnauthorizedException(
-        'Invalid email or password , please try again later',
-      );
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = {
-      name: admin.name as string,
-      email: admin.email as string,
+    const payload: JwtPayload = {
       id: admin.id,
+      email: admin.email as string,
+      name: admin.name as string,
+      role: admin.role,
       isGuest: admin.isGuest as boolean,
       isPaid: admin.isPaid as boolean,
-      role: admin.role,
+      isOwner: admin.isOwner as boolean,
     };
 
     let accessToken: string = '';
@@ -60,23 +61,34 @@ export class AdminService {
       refreshToken = this.auth.generateToken(payload, 'admin', 'refresh');
     }
 
+    const rawIp = clientIp || '127.0.0.1';
+    const cleanIp = rawIp.replace('::ffff:', '').trim();
+    const { browser, os, device } = parseUserAgent(userAgent);
+
     await this.prisma.user.update({
       where: { id: admin.id },
       data: {
         refreshToken: this.auth.hashToken(refreshToken),
         lastLoginAt: new Date(),
+        lastActiveIp: cleanIp,
         loginCount: { increment: 1 },
       },
     });
 
     try {
+      await this.prisma.userSession.updateMany({
+        where: { userId: admin.id, isCurrent: true },
+        data: { isCurrent: false },
+      });
+
       await this.prisma.userSession.create({
         data: {
           userId: admin.id,
-          ipAddress: '127.0.0.1',
-          browser: 'Chrome / Web App',
-          os: 'Desktop',
-          device: 'Desktop',
+          ipAddress: cleanIp,
+          userAgent: userAgent || null,
+          browser,
+          os,
+          device,
           loginAt: new Date(),
           lastActiveAt: new Date(),
           durationSeconds: 60,

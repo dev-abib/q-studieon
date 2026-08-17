@@ -3,10 +3,12 @@ import {
   Controller,
   Headers,
   HttpCode,
-  Ip,
   Post,
+  Req,
   BadRequestException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { getClientIp } from '../../common/helpers/ip.helper';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { Public } from '../decorators/public.decorator';
 import { RegisterDto } from '../dto/register.dto';
@@ -42,9 +44,10 @@ export class UserController {
   @ApiOperation({ summary: 'User login' })
   login(
     @Body() dto: LoginDto,
-    @Ip() ip: string,
+    @Req() req: Request,
     @Headers('user-agent') userAgent?: string,
   ) {
+    const ip = getClientIp(req);
     return this.authService.loginAccount(dto, ip, userAgent);
   }
 
@@ -55,9 +58,10 @@ export class UserController {
   @ApiOperation({ summary: 'Verify user account with OTP' })
   verifyAccount(
     @Body() dto: VerifyAccountDto,
-    @Ip() ip: string,
+    @Req() req: Request,
     @Headers('user-agent') userAgent?: string,
   ) {
+    const ip = getClientIp(req);
     return this.authService.verifyAccount(dto, ip, userAgent);
   }
 
@@ -119,7 +123,11 @@ export class UserController {
   @HttpCode(200)
   @Public()
   @ApiOperation({ summary: 'Login as a guest user' })
-  guestLogin(@Ip() ip: string, @Headers('x-device-id') deviceId: string) {
+  guestLogin(
+    @Req() req: Request,
+    @Headers('x-device-id') deviceId: string,
+  ) {
+    const ip = getClientIp(req);
     return this.authService.guestLogin(ip, deviceId);
   }
 
@@ -153,10 +161,11 @@ export class UserController {
   googleLogin(
     @Body('token') token: string,
     @Body('guestId') guestId: string | undefined,
-    @Ip() ip: string,
+    @Req() req: Request,
     @Headers('user-agent') userAgent?: string,
   ) {
     if (!token) throw new BadRequestException('Google token is required');
+    const ip = getClientIp(req);
     return this.authService.googleLogin(token, guestId, ip, userAgent);
   }
 
@@ -190,10 +199,11 @@ export class UserController {
   appleLogin(
     @Body('token') token: string,
     @Body('guestId') guestId: string | undefined,
-    @Ip() ip: string,
+    @Req() req: Request,
     @Headers('user-agent') userAgent?: string,
   ) {
     if (!token) throw new BadRequestException('Apple token is required');
+    const ip = getClientIp(req);
     return this.authService.appleLogin(token, guestId, ip, userAgent);
   }
 

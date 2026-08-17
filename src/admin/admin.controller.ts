@@ -10,10 +10,13 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UnauthorizedException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { getClientIp } from '../common/helpers/ip.helper';
 import {
   ApiTags,
   ApiOperation,
@@ -76,7 +79,10 @@ export class AdminController {
   recordPresenceHeartbeat(
     @CurrentUser() admin: JwtPayload,
     @Body() dto: PresenceHeartbeatDto,
+    @Req() req: Request,
   ) {
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers['user-agent'] as string | undefined;
     return this.presenceService.recordHeartbeat(
       admin.id,
       admin.name,
@@ -84,6 +90,8 @@ export class AdminController {
       admin.role,
       undefined,
       dto,
+      clientIp,
+      userAgent,
     );
   }
 
