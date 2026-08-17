@@ -658,6 +658,13 @@ export class ContactQueryService {
       await this.prisma.contactQuery.deleteMany({
         where: { id: { in: ids } },
       });
+
+      this.chatGateway.sendNotificationToAdmins(
+        'Inquiries Deleted 🗑️',
+        `${ids.length} inquiries permanently removed by ${currentAdmin.name || 'Admin'}.`,
+        { url: '/dashboard/queries', actorId: currentAdmin.id }
+      );
+
       return {
         success: true,
         message: `${ids.length} inquiries deleted successfully.`,
@@ -669,6 +676,13 @@ export class ContactQueryService {
         where: { id: { in: ids } },
         data: { status },
       });
+
+      this.chatGateway.sendNotificationToAdmins(
+        'Inquiries Status Updated 📨',
+        `${ids.length} inquiries updated to status "${status}" by ${currentAdmin.name || 'Admin'}.`,
+        { url: '/dashboard/queries', actorId: currentAdmin.id }
+      );
+
       return {
         success: true,
         message: `${ids.length} inquiries updated to status ${status}.`,
@@ -680,6 +694,13 @@ export class ContactQueryService {
         where: { id: { in: ids } },
         data: { priority },
       });
+
+      this.chatGateway.sendNotificationToAdmins(
+        'Inquiries Priority Updated ⚠️',
+        `${ids.length} inquiries set to priority "${priority}" by ${currentAdmin.name || 'Admin'}.`,
+        { url: '/dashboard/queries', actorId: currentAdmin.id }
+      );
+
       return {
         success: true,
         message: `${ids.length} inquiries updated to priority ${priority}.`,
@@ -707,6 +728,19 @@ export class ContactQueryService {
           transferNote: transferNote || null,
         },
       });
+
+      this.chatGateway.sendNotificationToUser(
+        targetStaff.id,
+        'Inquiries Assigned 📨',
+        `${ids.length} inquiries assigned to you by ${currentAdmin.name || 'Admin'}.`,
+        { url: '/dashboard/queries', actorId: currentAdmin.id }
+      );
+
+      this.chatGateway.sendNotificationToAdmins(
+        'Inquiries Bulk Delegated 📨',
+        `${ids.length} inquiries assigned to ${targetStaff.name || targetStaff.email} by ${currentAdmin.name || 'Admin'}.`,
+        { url: '/dashboard/queries', actorId: currentAdmin.id }
+      );
 
       return {
         success: true,
