@@ -1,6 +1,6 @@
-// src/push/push.controller.ts
 import {
   Controller,
+  Get,
   Post,
   Delete,
   Body,
@@ -11,6 +11,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/guards/auth-guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Auth } from '../auth/decorators/auth.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { PushService } from './push.service';
 import type { PushSubscriptionInput } from './push.service';
 import type { Request } from 'express';
@@ -21,14 +22,24 @@ interface RequestWithUser extends Request {
 }
 
 @ApiTags('Push Notifications')
-@Auth('admin')
-@UseGuards(AuthGuard, RolesGuard)
 @Controller('push')
 export class PushController {
   constructor(private readonly pushService: PushService) {}
 
+  // Get VAPID public key for Web Push client subscription
+  @Get('vapid-public-key')
+  @Public()
+  @ApiOperation({ summary: 'Get VAPID public key for Web Push subscription' })
+  getVapidPublicKey() {
+    return {
+      publicKey: process.env.VAPID_PUBLIC_KEY || '',
+    };
+  }
+
   // Register this browser/device for OS push notifications
   @Post('subscribe')
+  @Auth('admin')
+  @UseGuards(AuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Register a device for OS push notifications' })
   subscribe(
     @Req() req: RequestWithUser,
