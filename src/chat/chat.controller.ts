@@ -92,6 +92,26 @@ export class ChatController {
     return this.chatService.leaveGroup(id, req.user.id);
   }
 
+  @Post('groups/:id/members')
+  @ApiOperation({ summary: 'Add a member to a group' })
+  addMember(
+    @Request() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() body: { staffId: string },
+  ) {
+    return this.chatService.addMember(id, req.user.id, body.staffId);
+  }
+
+  @Delete('groups/:id/members/:staffId')
+  @ApiOperation({ summary: 'Remove a member from a group' })
+  removeMember(
+    @Request() req: RequestWithUser,
+    @Param('id') id: string,
+    @Param('staffId') staffId: string,
+  ) {
+    return this.chatService.removeMember(id, req.user.id, staffId);
+  }
+
   @Delete('groups/:id')
   @Roles('super_admin')
   @ApiOperation({ summary: 'Archive a group (super_admin only)' })

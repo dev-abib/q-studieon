@@ -177,6 +177,80 @@ export class ChatService {
     return { success: true };
   }
 
+  async addMember(groupId: string, requesterId: string, staffId: string) {
+    const group = await this.prisma.chatGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Group not found');
+
+    const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });
+    const isSuperAdmin = requester?.role === 'super_admin';
+    const isMember = group.members.some((m) => m.staffId === requesterId);
+
+    if (group.createdById !== requesterId && !isSuperAdmin && !isMember) {
+      throw new ForbiddenException('Only group members or super admins can add members');
+    }
+
+    const existingMember = group.members.find((m) => m.staffId === staffId);
+    if (!existingMember) {
+      await this.prisma.chatGroupMember.create({
+        data: {
+          groupId,
+          staffId,
+        },
+      });
+    }
+
+    return this.prisma.chatGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        members: {
+          include: {
+            staff: { select: { id: true, name: true, profilePictureURL: true, role: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async removeMember(groupId: string, requesterId: string, staffId: string) {
+    const group = await this.prisma.chatGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Group not found');
+
+    const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });
+    const isSuperAdmin = requester?.role === 'super_admin';
+
+    if (group.createdById !== requesterId && !isSuperAdmin && requesterId !== staffId) {
+      throw new ForbiddenException('Only group creator or super admin can remove members');
+    }
+
+    if (staffId === group.createdById) {
+      throw new ForbiddenException('Cannot remove the group creator from the group');
+    }
+
+    await this.prisma.chatGroupMember.deleteMany({
+      where: {
+        groupId,
+        staffId,
+      },
+    });
+
+    return this.prisma.chatGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        members: {
+          include: {
+            staff: { select: { id: true, name: true, profilePictureURL: true, role: true } },
+          },
+        },
+      },
+    });
+  }
+
   // ─── Messages ──────────────────────────────────────────────────────────────
 
   async getGroupMessages(groupId: string, staffId: string, cursor?: string) {

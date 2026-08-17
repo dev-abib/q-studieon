@@ -434,4 +434,60 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await client.join('super_admin_room');
     return { success: true };
   }
+
+  // ─── Group Member Management Socket Events ─────────────────────────────────
+
+  @SubscribeMessage('addGroupMember')
+  async handleAddGroupMember(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { groupId: string; staffId: string },
+  ) {
+    const user = (client as AuthenticatedSocket).user;
+    const updatedGroup = await this.chatService.addMember(
+      data.groupId,
+      user.id,
+      data.staffId,
+    );
+
+    // Notify room and added member
+    this.server.to(`group:${data.groupId}`).emit('groupMemberAdded', {
+      groupId: data.groupId,
+      group: updatedGroup,
+      addedStaffId: data.staffId,
+    });
+    this.server.to(`user:${data.staffId}`).emit('groupMemberAdded', {
+      groupId: data.groupId,
+      group: updatedGroup,
+      addedStaffId: data.staffId,
+    });
+
+    return { success: true, group: updatedGroup };
+  }
+
+  @SubscribeMessage('removeGroupMember')
+  async handleRemoveGroupMember(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { groupId: string; staffId: string },
+  ) {
+    const user = (client as AuthenticatedSocket).user;
+    const updatedGroup = await this.chatService.removeMember(
+      data.groupId,
+      user.id,
+      data.staffId,
+    );
+
+    // Notify room and removed member
+    this.server.to(`group:${data.groupId}`).emit('groupMemberRemoved', {
+      groupId: data.groupId,
+      group: updatedGroup,
+      removedStaffId: data.staffId,
+    });
+    this.server.to(`user:${data.staffId}`).emit('groupMemberRemoved', {
+      groupId: data.groupId,
+      group: updatedGroup,
+      removedStaffId: data.staffId,
+    });
+
+    return { success: true, group: updatedGroup };
+  }
 }
