@@ -437,7 +437,7 @@ export class ContactQueryService {
     this.chatGateway.sendNotificationToAdmins(
       'Inquiry Replied & Resolved 📨',
       `Inquiry "${query.subject}" from ${query.name} replied by ${responderName}.`,
-      { queryId: query.id, url: '/dashboard/queries' }
+      { queryId: query.id, url: '/dashboard/queries', actorId: adminPayload.id }
     );
 
     return {
@@ -503,13 +503,13 @@ export class ContactQueryService {
       targetStaff.id,
       'Inquiry Assigned 📨',
       `Inquiry "${existing.subject}" assigned to you by ${assignerName}.`,
-      { queryId: existing.id, url: '/dashboard/queries' }
+      { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
     );
 
     this.chatGateway.sendNotificationToAdmins(
       'Inquiry Transferred 📨',
       `Inquiry "${existing.subject}" assigned to ${targetStaff.name || targetStaff.email} by ${assignerName}.`,
-      { queryId: existing.id, url: '/dashboard/queries' }
+      { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
     );
 
     return {
@@ -548,10 +548,19 @@ export class ContactQueryService {
       },
     });
 
+    if (existing.assignedToId && existing.assignedToId !== currentAdmin.id) {
+      this.chatGateway.sendNotificationToUser(
+        existing.assignedToId,
+        'Inquiry Priority Changed ⚠️',
+        `Inquiry "${existing.subject}" priority set to ${priority} by ${currentAdmin.name || 'Admin'}.`,
+        { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
+      );
+    }
+
     this.chatGateway.sendNotificationToAdmins(
       'Inquiry Priority Changed ⚠️',
       `Inquiry "${existing.subject}" priority set to ${priority} by ${currentAdmin.name || 'Admin'}.`,
-      { queryId: existing.id, url: '/dashboard/queries' }
+      { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
     );
 
     return {
@@ -599,14 +608,14 @@ export class ContactQueryService {
         existing.assignedToId,
         'New Case Discussion Note 📝',
         `${currentAdmin.name || 'Admin'} added a note on "${existing.subject}": "${note.trim().slice(0, 60)}"`,
-        { queryId: existing.id, url: '/dashboard/queries' }
+        { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
       );
     }
 
     this.chatGateway.sendNotificationToAdmins(
       'New Case Discussion Note 📝',
       `${currentAdmin.name || 'Admin'} added a note on "${existing.subject}": "${note.trim().slice(0, 60)}"`,
-      { queryId: existing.id, url: '/dashboard/queries' }
+      { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
     );
 
     return {
@@ -864,14 +873,14 @@ export class ContactQueryService {
         existing.assignedToId,
         'Inquiry Status Updated 📨',
         `Inquiry "${existing.subject}" status changed from ${existing.status} to ${status} by ${updaterName}.`,
-        { queryId: existing.id, url: '/dashboard/queries' }
+        { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin?.id }
       );
     }
 
     this.chatGateway.sendNotificationToAdmins(
       'Inquiry Status Changed 📨',
       `Inquiry "${existing.subject}" status updated to "${status}" by ${updaterName}.`,
-      { queryId: existing.id, url: '/dashboard/queries' }
+      { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin?.id }
     );
 
     return updated;
@@ -892,6 +901,12 @@ export class ContactQueryService {
     await this.prisma.contactQuery.delete({
       where: { id },
     });
+
+    this.chatGateway.sendNotificationToAdmins(
+      'Inquiry Deleted 🗑️',
+      `Inquiry "${existing.subject}" from ${existing.name} was removed by ${currentAdmin.name || 'Admin'}.`,
+      { queryId: existing.id, url: '/dashboard/queries', actorId: currentAdmin.id }
+    );
 
     return {
       success: true,
