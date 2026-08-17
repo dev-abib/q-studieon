@@ -423,6 +423,48 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { success: true };
   }
 
+  // ─── Toggle Reaction ───────────────────────────────────────────────────────
+
+  @SubscribeMessage('toggleReaction')
+  async handleToggleReaction(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: {
+      messageId: string;
+      emoji: string;
+      groupId?: string;
+      dmPartnerId?: string;
+    },
+  ) {
+    const user = (client as AuthenticatedSocket).user;
+    const result = await this.chatService.toggleReaction(
+      data.messageId,
+      user.id,
+      data.emoji,
+    );
+
+    const eventPayload = {
+      messageId: data.messageId,
+      reactions: result.reactions,
+      groupId: result.groupId,
+      dmPartnerId: result.dmPartnerId,
+    };
+
+    if (result.groupId) {
+      this.server.to(`group:${result.groupId}`).emit('messageReactionUpdated', eventPayload);
+    } else if (result.dmPartnerId || result.senderId) {
+      this.server.to(`user:${user.id}`).emit('messageReactionUpdated', eventPayload);
+      if (result.dmPartnerId) {
+        this.server.to(`user:${result.dmPartnerId}`).emit('messageReactionUpdated', eventPayload);
+      }
+      if (result.senderId && result.senderId !== user.id) {
+        this.server.to(`user:${result.senderId}`).emit('messageReactionUpdated', eventPayload);
+      }
+    }
+
+    return { success: true, ...result };
+  }
+
   // ─── Super admin joins surveillance room ───────────────────────────────────
 
   @SubscribeMessage('joinSurveillance')

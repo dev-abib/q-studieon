@@ -270,6 +270,9 @@ export class ChatService {
         mentions: {
           include: { mentioned: { select: { id: true, name: true } } },
         },
+        reactions: {
+          include: { user: { select: { id: true, name: true, profilePictureURL: true } } },
+        },
       },
     });
   }
@@ -293,6 +296,9 @@ export class ChatService {
         sender: { select: { id: true, name: true, profilePictureURL: true, role: true } },
         mentions: {
           include: { mentioned: { select: { id: true, name: true } } },
+        },
+        reactions: {
+          include: { user: { select: { id: true, name: true, profilePictureURL: true } } },
         },
       },
     });
@@ -368,6 +374,9 @@ export class ChatService {
         mentions: {
           include: { mentioned: { select: { id: true, name: true } } },
         },
+        reactions: {
+          include: { user: { select: { id: true, name: true, profilePictureURL: true } } },
+        },
       },
     });
   }
@@ -379,8 +388,63 @@ export class ChatService {
     return this.prisma.chatMessage.update({
       where: { id: messageId },
       data: { content, isEdited: true, editedAt: new Date() },
-      include: { sender: { select: { id: true, name: true, profilePictureURL: true, role: true } } },
+      include: {
+        sender: { select: { id: true, name: true, profilePictureURL: true, role: true } },
+        mentions: {
+          include: { mentioned: { select: { id: true, name: true } } },
+        },
+        reactions: {
+          include: { user: { select: { id: true, name: true, profilePictureURL: true } } },
+        },
+      },
     });
+  }
+
+  async toggleReaction(messageId: string, userId: string, emoji: string) {
+    const msg = await this.prisma.chatMessage.findUnique({
+      where: { id: messageId },
+      select: { id: true, groupId: true, dmPartnerId: true, senderId: true },
+    });
+    if (!msg) throw new NotFoundException('Message not found');
+
+    const existing = await this.prisma.chatReaction.findUnique({
+      where: {
+        messageId_userId_emoji: {
+          messageId,
+          userId,
+          emoji,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.chatReaction.delete({
+        where: { id: existing.id },
+      });
+    } else {
+      await this.prisma.chatReaction.create({
+        data: {
+          messageId,
+          userId,
+          emoji,
+        },
+      });
+    }
+
+    const updatedReactions = await this.prisma.chatReaction.findMany({
+      where: { messageId },
+      include: {
+        user: { select: { id: true, name: true, profilePictureURL: true } },
+      },
+    });
+
+    return {
+      messageId,
+      groupId: msg.groupId,
+      dmPartnerId: msg.dmPartnerId,
+      senderId: msg.senderId,
+      reactions: updatedReactions,
+    };
   }
 
   async deleteMessage(messageId: string, requesterId: string, isSuperAdmin: boolean) {

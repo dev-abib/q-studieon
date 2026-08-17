@@ -70,6 +70,7 @@ model ChatMessage {
   group     ChatGroup?        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   mentions  ChatMention[]
   reads     ChatRead[]
+  reactions ChatReaction[]
 
   @@index([senderId])
   @@index([groupId])
@@ -112,4 +113,20 @@ model ChatRead {
   @@unique([staffId, dmPartnerId])
   @@index([staffId])
   @@map("chat_reads")
+}
+
+model ChatReaction {
+  id        String      @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime    @default(now())
+
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation("UserReaction", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+  @@map("chat_reactions")
 }

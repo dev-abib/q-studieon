@@ -174,6 +174,17 @@ export class ChatController {
     });
   }
 
+  @Post('messages/:id/reaction')
+  @ApiOperation({ summary: 'Add or remove an emoji reaction on a message' })
+  toggleReaction(
+    @Request() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() body: { emoji: string },
+  ) {
+    if (!body.emoji) throw new BadRequestException('Emoji is required');
+    return this.chatService.toggleReaction(id, req.user.id, body.emoji);
+  }
+
   @Patch('messages/:id/flag')
   @Roles('super_admin')
   @ApiOperation({ summary: 'Super admin: manually flag a message' })
